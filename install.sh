@@ -8,7 +8,7 @@ if [ -f /etc/os-release ]; then grep PRETTY_NAME /etc/os-release; fi
 
 echo "[1/3] system packages (PyQt6 tray support)..."
 sudo apt update
-sudo apt install -y python3-pyqt6 python3-requests libnotify-bin
+sudo apt install -y python3-pyqt6 python3-requests libnotify-bin libxcb-cursor0
 
 echo "[2/3] python extras (optional)..."
 pip3 install --user -r requirements.txt || pip3 install --user --break-system-packages -r requirements.txt || echo "(pip step skipped — apt packages are enough for core app)"
