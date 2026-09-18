@@ -14,11 +14,14 @@ echo "[2/3] python extras (optional)..."
 pip3 install --user -r requirements.txt || pip3 install --user --break-system-packages -r requirements.txt || echo "(pip step skipped — apt packages are enough for core app)"
 
 echo "[3/3] autostart entry..."
-mkdir -p ~/.config/autostart
+mkdir -p ~/.config/autostart ~/.local/share/applications
 HERE="$(pwd)"
 ESCAPED_HERE="$(printf '%s' "$HERE" | sed 's/[&|\\]/\\&/g')"
 sed "s|__HERE__|$ESCAPED_HERE|g" autostart/session-sync.desktop > ~/.config/autostart/session-sync.desktop
+sed "s|__HERE__|$ESCAPED_HERE|g" autostart/session-sync.desktop > ~/.local/share/applications/session-sync.desktop
+update-desktop-database ~/.local/share/applications 2>/dev/null || true
 echo "installed autostart -> ~/.config/autostart/session-sync.desktop"
+echo "installed launcher  -> ~/.local/share/applications/session-sync.desktop"
 
 echo ""
 echo "Run:   python3 main.py"
