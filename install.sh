@@ -15,7 +15,9 @@ pip3 install --user -r requirements.txt || pip3 install --user --break-system-pa
 
 echo "[3/3] autostart entry..."
 mkdir -p ~/.config/autostart
-sed "s|__HERE__|$(pwd)|g" autostart/session-sync.desktop > ~/.config/autostart/session-sync.desktop
+HERE="$(pwd)"
+ESCAPED_HERE="$(printf '%s' "$HERE" | sed 's/[&|\\]/\\&/g')"
+sed "s|__HERE__|$ESCAPED_HERE|g" autostart/session-sync.desktop > ~/.config/autostart/session-sync.desktop
 echo "installed autostart -> ~/.config/autostart/session-sync.desktop"
 
 echo ""
