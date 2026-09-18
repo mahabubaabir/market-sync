@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.cache/
+.venv/
+venv/
+dist/
+build/
+*.spec
+# opencode session exports (large, local only)
+new-session---*.json

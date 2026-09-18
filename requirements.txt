@@ -1,0 +1,6 @@
+# Mint/Ubuntu recommended: sudo apt install python3-pyqt6
+# then: pip install -r requirements.txt  (or pip install --user -r requirements.txt)
+PyQt6>=6.6
+requests>=2.31
+# optional desktop notifications (falls back to notify-send automatically):
+plyer>=2.1

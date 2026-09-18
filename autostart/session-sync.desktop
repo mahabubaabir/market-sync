@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Session Sync
+Comment=Market countdown + news for your panel
+Exec=python3 __HERE__/main.py
+Path=__HERE__
+Icon=__HERE__/assets/icon.svg
+Terminal=false
+Categories=Finance;Office;
+X-GNOME-Autostart-enabled=true
