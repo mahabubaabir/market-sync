@@ -1,12 +1,12 @@
 [Desktop Entry]
 Type=Application
 Name=Session Sync
-Comment=Market countdown + news for your panel (dev checkout)
-Exec=/usr/bin/python3 __HERE__/main.py --hidden
-Path=__HERE__
-Icon=__HERE__/assets/icon.svg
+Comment=Market countdown + news (starts in tray)
+Exec=session-sync --hidden
+Icon=session-sync
 Terminal=false
 Categories=Finance;Office;
 X-GNOME-Autostart-enabled=true
 X-GNOME-Autostart-Delay=5
 StartupNotify=false
+NoDisplay=false

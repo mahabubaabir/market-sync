@@ -4,6 +4,27 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.0.0 — 2026-09-19 — distributable release
+- **Packaging**: proper `.deb` (`build-deb.sh`), one-line installer (`install.sh`),
+  GitHub Actions release workflow (`.github/workflows/release.yml`).
+  - installs to `/opt/session-sync`, launcher `/usr/bin/session-sync`
+  - crash-resilient launcher (restarts up to 3×), detaches from terminals
+  - `/etc/xdg/autostart/session-sync.desktop` → silent tray start at login
+    for all users; per-user `Hidden=true` override for the in-app toggle
+  - icons rendered to 8 PNG sizes + scalable SVG (`tools/render_icons.py`)
+- **Auto-update** (`updater.py`): checks GitHub Releases (24 h cache), tray
+  notification + one-click `pkexec apt-get install` + auto-relaunch.
+- **Themes**: 5 + system — light, dark, dark_purple, mint_light, mint_dark;
+  per-theme accent threaded through stylesheet + ring timer.
+- **Fixes**: autostart no longer leaks `--hidden` into saved settings;
+  `QCursor` imported at module level; dead imports removed; app logs to
+  `~/.cache/session-sync/app.log` with 1 MB rotation; single-instance guard
+  retries during updater relaunch; tray icon cached (no 1 s pixmap churn).
+- **Install discovery**: an older copy of this app at
+  `antigravity/code/trade_box/market-coundown&news` was auto-starting at login
+  (leftover `~/.config/autostart/market-sync.desktop`) and running the old
+  crash-prone build. Stale entry disabled; running instance stopped.
+
 ### v0.1.0 — 2026-09-18 — initial build
 - `main.py` — entry: tray GUI (`run_gui`) + CLI fallback (`run_cli --cli --news --once`)
 - `config.py` — 5 markets (SYDNEY, TOKYO, LONDON, NEW_YORK, NYSE), `settings.json` in `~/.config/session-sync/`
@@ -70,14 +91,19 @@ flowchart TD
 ## File map
 
 ```
-main.py          entry (tray + --cli fallback)
-config.py        market defs + ~/.config/session-sync/settings.json
+main.py          entry (tray + --cli fallback + --hidden + --check-update)
+config.py        market defs + settings + install/autostart paths + repo constants
 markets.py       DST-aware engine + NYSE holidays (stdlib only)
 calendar_api.py  ForexFactory feed + ~/.cache/session-sync cache
-ui.py            PyQt6 tray + Mint-Y panel
+ui.py            PyQt6 tray + panel + 6 themes + update UI
+updater.py       GitHub release check + deb download + pkexec install
 notifier.py      notify-send / plyer alerts
-install.sh       apt + pip + autostart installer
+install.sh       one-line installer (curl | sudo bash) → latest GitHub release
+build-deb.sh     one-command .deb build (stages in /tmp, POSIX fs safe)
+packaging/       DEBIAN/control + postinst + postrm, launcher, desktop files
+tools/           render_icons.py (PNG icon set for the .deb)
 requirements.txt PyQt6 + requests + plyer
 assets/icon.svg  app icon
-autostart/       Cinnamon autostart entry
+autostart/       dev-only Cinnamon autostart template
+.github/         release workflow (tag v* → build .deb → publish release)
 ```

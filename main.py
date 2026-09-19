@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+import signal
 from datetime import datetime, timezone
 
 from config import APP_NAME, APP_VERSION, MARKETS, get_market, load_settings, save_settings
@@ -52,6 +53,39 @@ def run_cli(args) -> int:
     return 0
 
 
+def _single_instance_or_exit() -> None:
+    """Prevent double-launch (two trays = flicker/hang on Cinnamon).
+
+    Retries briefly when relaunched by the updater so the new version can
+    take over the lock while the old process is still shutting down.
+    """
+    import os
+    import time
+    from config import LOCK_PATH
+    retries = 8 if os.environ.get("SESSION_SYNC_RELAUNCH") == "1" else 1
+    try:
+        os.makedirs(os.path.dirname(LOCK_PATH), exist_ok=True)
+        import fcntl
+        fh = open(LOCK_PATH, "w")
+        for _ in range(retries):
+            try:
+                fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                time.sleep(0.5)
+                continue
+            # keep handle open for process lifetime
+            globals()["_lock_fh"] = fh
+            fh.write(str(os.getpid()))
+            fh.flush()
+            return
+        print("Session Sync is already running (tray icon active).", file=sys.stderr)
+        sys.exit(0)
+    except SystemExit:
+        raise
+    except Exception:
+        pass
+
+
 def run_gui(args) -> int:
     try:
         from PyQt6.QtWidgets import QApplication
@@ -64,6 +98,8 @@ def run_gui(args) -> int:
         print("\nFalling back to CLI mode. Run with --cli for text output.", file=sys.stderr)
         return run_cli(args)
 
+    _single_instance_or_exit()
+
     settings = load_settings()
     if args.market:
         settings["selected_market"] = args.market
@@ -72,10 +108,25 @@ def run_gui(args) -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setQuitOnLastWindowClosed(False)
+
     if not __import__("PyQt6.QtWidgets", fromlist=["QSystemTrayIcon"]).QSystemTrayIcon.isSystemTrayAvailable():
         print("Warning: no system tray detected — panel will still work.", file=sys.stderr)
+
     ctl = TrayController(app, settings)
-    ctl.toggle_panel()  # show panel on launch like the reference app's dropdown
+
+    def handle_signal(signum, frame):
+        ctl.quit_app()
+
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+
+    # Normal launch -> show panel once.
+    # --hidden (autostart/background) or saved start_hidden -> tray only.
+    # Note: we do NOT persist --hidden into settings, so manual launches
+    # stay visible unless the user explicitly ticks "Start hidden in tray".
+    hidden_launch = bool(getattr(args, "hidden", False)) or settings.get("start_hidden", False)
+    if not hidden_launch:
+        ctl.toggle_panel()
     return app.exec()
 
 
@@ -86,10 +137,24 @@ def main() -> int:
     ap.add_argument("--once", action="store_true", help="with --cli: print once and exit")
     ap.add_argument("--news", action="store_true", help="with --cli: show next news event")
     ap.add_argument("--refresh", action="store_true", help="force-refresh news cache")
+    ap.add_argument("--hidden", action="store_true", help="start hidden in tray (for autostart/background)")
+    ap.add_argument("--check-update", action="store_true", help="check GitHub for a newer release and exit")
     ap.add_argument("--version", action="store_true", help="print version")
     args = ap.parse_args()
     if args.version:
         print(f"{APP_NAME} {APP_VERSION}")
+        return 0
+    if args.check_update:
+        import updater
+        res = updater.check_for_update(force=True)
+        if res:
+            print(f"Update available: v{res.get('version')} ({res.get('tag')})")
+            if res.get("deb_url"):
+                print(f"  deb:   {res['deb_url']}")
+            if res.get("html_url"):
+                print(f"  notes: {res['html_url']}")
+        else:
+            print(f"Up to date (v{APP_VERSION}).")
         return 0
     if args.cli or args.once:
         return run_cli(args)

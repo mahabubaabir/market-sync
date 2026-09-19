@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Session Sync
+Comment=Market countdown + economic news in your tray
+Exec=session-sync
+Icon=session-sync
+Terminal=false
+Categories=Finance;Office;
+StartupNotify=false
+Keywords=markets;forex;nyse;countdown;news;calendar;trading;

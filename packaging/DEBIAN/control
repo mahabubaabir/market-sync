@@ -1,0 +1,18 @@
+Package: session-sync
+Version: __VERSION__
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3 (>= 3.10), python3-pyqt6, python3-requests, libnotify-bin, libxcb-cursor0
+Recommends: pkexec | policykit-1
+Maintainer: mahabubaabir <mahabubaabir@users.noreply.github.com>
+Homepage: https://github.com/mahabubaabir/market-sync
+Description: Market countdown + economic news in your system tray
+ Session Sync shows a live open/close countdown for Sydney, Tokyo, London,
+ New York FX and NYSE, a DST-aware market clock next to your local time,
+ and the next economic events from the ForexFactory calendar.
+ .
+ It lives in the system tray (Cinnamon/MATE/Xfce/GNOME), can start silently
+ at login, supports one-click self-updates from GitHub releases, and ships
+ six themes (system, light, dark, dark purple, mint light, mint dark).
+Installed-Size: 512

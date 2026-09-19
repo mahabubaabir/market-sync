@@ -1,0 +1,10 @@
+#!/bin/bash
+# Session Sync post-remove: refresh caches, drop any stray launcher.
+set -e
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+  if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database -q /usr/share/applications 2>/dev/null || true
+  fi
+  rm -f /usr/bin/session-sync
+fi
+exit 0

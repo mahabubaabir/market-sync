@@ -8,3 +8,4 @@ build/
 *.spec
 # opencode session exports (large, local only)
 new-session---*.json
+installation-help-request.json

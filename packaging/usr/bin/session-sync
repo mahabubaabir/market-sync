@@ -1,0 +1,38 @@
+#!/bin/bash
+# Session Sync launcher (installed as /usr/bin/session-sync).
+# - Detaches from the terminal so closing it never kills the app.
+# - Restarts after a crash (up to 3 times); clean quit ends the loop.
+APP_DIR="/opt/session-sync"
+LOG_DIR="$HOME/.cache/session-sync"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+LOG="$LOG_DIR/app.log"
+
+# rotate at 1 MB
+if [ -f "$LOG" ] && [ "$(stat -c%s "$LOG" 2>/dev/null || echo 0)" -gt 1048576 ]; then
+  mv -f "$LOG" "$LOG.1" 2>/dev/null || true
+fi
+
+run_loop() {
+  cd "$APP_DIR" 2>/dev/null || exit 1
+  local code=0
+  local attempt
+  for attempt in 1 2 3; do
+    /usr/bin/python3 "$APP_DIR/main.py" "$@" >>"$LOG" 2>&1
+    code=$?
+    if [ "$code" -eq 0 ]; then
+      exit 0
+    fi
+    sleep 2
+  done
+  exit "$code"
+}
+
+# Launching from a terminal? Detach so the app survives the terminal closing.
+if [ -t 2 ]; then
+  setsid /usr/bin/session-sync "$@" >/dev/null 2>&1 < /dev/null &
+  disown 2>/dev/null || true
+  echo "Session Sync started in the background (log: $LOG)"
+  exit 0
+fi
+
+run_loop "$@"

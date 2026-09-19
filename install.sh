@@ -1,29 +1,82 @@
 #!/bin/bash
-# Session Sync — installer for Linux Mint / Ubuntu (Cinnamon)
+# Session Sync — one-line installer for Linux Mint / Ubuntu (and derivatives).
+#
+#   curl -sL https://raw.githubusercontent.com/mahabubaabir/market-sync/main/install.sh | sudo bash
+#
+# It downloads the latest release .deb from GitHub and installs it with apt,
+# so dependencies (PyQt6 etc.) are resolved automatically.
 set -e
-cd "$(dirname "$0")"
+
+REPO="mahabubaabir/market-sync"
+APP="session-sync"
+TMP="/tmp/${APP}-install.deb"
 
 echo "== Session Sync installer =="
-if [ -f /etc/os-release ]; then grep PRETTY_NAME /etc/os-release; fi
 
-echo "[1/3] system packages (PyQt6 tray support)..."
-sudo apt update
-sudo apt install -y python3-pyqt6 python3-requests libnotify-bin libxcb-cursor0
+if [ "$(id -u)" -ne 0 ]; then
+  echo "This installer needs root. Run:" >&2
+  echo "  curl -sL https://raw.githubusercontent.com/$REPO/main/install.sh | sudo bash" >&2
+  exit 1
+fi
 
-echo "[2/3] python extras (optional)..."
-pip3 install --user -r requirements.txt || pip3 install --user --break-system-packages -r requirements.txt || echo "(pip step skipped — apt packages are enough for core app)"
+if ! command -v curl >/dev/null 2>&1; then
+  echo "curl is required. Install it first: sudo apt install curl" >&2
+  exit 1
+fi
 
-echo "[3/3] autostart entry..."
-mkdir -p ~/.config/autostart ~/.local/share/applications
-HERE="$(pwd)"
-ESCAPED_HERE="$(printf '%s' "$HERE" | sed 's/[&|\\]/\\&/g')"
-sed "s|__HERE__|$ESCAPED_HERE|g" autostart/session-sync.desktop > ~/.config/autostart/session-sync.desktop
-sed "s|__HERE__|$ESCAPED_HERE|g" autostart/session-sync.desktop > ~/.local/share/applications/session-sync.desktop
-update-desktop-database ~/.local/share/applications 2>/dev/null || true
-echo "installed autostart -> ~/.config/autostart/session-sync.desktop"
-echo "installed launcher  -> ~/.local/share/applications/session-sync.desktop"
+echo "[1/3] fetching latest release from github.com/$REPO ..."
+JSON="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" || true)"
+URL="$(printf '%s' "$JSON" | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+for a in d.get("assets", []):
+    if str(a.get("name", "")).endswith(".deb"):
+        print(a.get("browser_download_url", ""))
+        break
+')"
+TAG="$(printf '%s' "$JSON" | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+print(d.get("tag_name", ""))
+')"
+
+if [ -n "$URL" ]; then
+  echo "[2/3] downloading $TAG ..."
+  curl -fL "$URL" -o "$TMP"
+else
+  # No release yet? If this script sits inside a source checkout, build locally.
+  HERE="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo .)"
+  if [ -f "$HERE/build-deb.sh" ]; then
+    echo "[2/3] no GitHub release found — building locally from $HERE ..."
+    bash "$HERE/build-deb.sh"
+    DEB="$(ls -1 "$HERE"/dist/${APP}_*_all.deb 2>/dev/null | head -n1)"
+    if [ -z "$DEB" ]; then
+      echo "ERROR: local build produced no .deb." >&2
+      exit 1
+    fi
+    cp -f "$DEB" "$TMP"
+  else
+    echo "ERROR: no .deb asset in the latest release of $REPO." >&2
+    echo "The maintainer must publish a release first (see README: Releasing)." >&2
+    exit 1
+  fi
+fi
+
+echo "[3/3] installing with apt (dependencies resolved automatically) ..."
+apt-get install -y "$TMP"
+rm -f "$TMP"
 
 echo ""
-echo "Run:   python3 main.py"
-echo "CLI:   python3 main.py --cli --news"
-echo "Quit tray via right-click > Quit Session Sync"
+echo "✓ Session Sync installed."
+echo ""
+echo "  Launch now:        session-sync"
+echo "  Menu:              press Super, search \"Session Sync\""
+echo "  It also starts automatically (silent, in tray) on your next login."
+echo "  Quit:              tray icon → right-click → Quit  (or panel → Quit app)"
+echo "  Uninstall:         sudo apt remove session-sync"
