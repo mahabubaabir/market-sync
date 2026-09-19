@@ -55,7 +55,8 @@ install -m 0755 packaging/DEBIAN/postrm "$BUILD/DEBIAN/postrm"
 # --- normalize permissions (umask-proof; dpkg-deb requires sane modes)
 find "$BUILD" -type d -exec chmod 0755 {} +
 find "$BUILD" -type f -exec chmod 0644 {} +
-chmod 0755 "$BUILD/DEBIAN/postinst" "$BUILD/DEBIAN/postrm" "$BUILD/usr/bin/$APP"
+chmod 0755 "$BUILD/DEBIAN/postinst" "$BUILD/DEBIAN/postrm" \
+           "$BUILD/usr/bin/$APP" "$BUILD/opt/$APP/install-applet.sh"
 
 # --- build
 mkdir -p dist
