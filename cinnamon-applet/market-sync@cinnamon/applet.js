@@ -36,7 +36,10 @@ MarketSyncApplet.prototype = {
         this.set_applet_label("Market Sync");
         this.set_applet_tooltip("Market Sync — click to open the panel");
 
-        this._apply_icon(panel_height);
+        // Sessions only in the top bar — no logo/icon.
+        if (this._applet_icon) {
+            this._applet_icon.hide();
+        }
         this._setup_context_menu();
         this._update();
 
@@ -45,27 +48,6 @@ MarketSyncApplet.prototype = {
             this._update();
             return true;
         });
-    },
-
-    _apply_icon: function(panel_height) {
-        let path = this.metadata.path;
-        let candidates = [
-            path + "/icon.svg",
-            path + "/icon.png",
-            GLib.get_home_dir() + "/.local/share/cinnamon/applets/" + UUID + "/icon.svg",
-            "/opt/market-sync/assets/logo.svg",
-        ];
-        for (let c of candidates) {
-            if (GLib.file_test(c, GLib.FileTest.EXISTS)) {
-                this.set_applet_icon_path(c);
-                if (this._applet_icon) {
-                    let s = Math.max(16, Math.min(24, (panel_height || 24) - 4));
-                    this._applet_icon.set_icon_size(s);
-                }
-                return;
-            }
-        }
-        this.set_applet_icon_name("view-refresh-symbolic");
     },
 
     _resolve_app_dir: function() {

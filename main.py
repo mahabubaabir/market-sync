@@ -13,7 +13,7 @@ import time
 import signal
 from datetime import datetime, timezone
 
-from config import APP_NAME, APP_VERSION, MARKETS, get_market, load_settings, save_settings
+from config import APP_NAME, APP_VERSION, MARKETS, get_market, load_settings, save_settings, app_dir
 import markets as engine
 import calendar_api
 
@@ -131,6 +131,15 @@ def run_gui(args) -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setQuitOnLastWindowClosed(False)
+    # Application logo: use the squircle app icon for taskbar/window lists
+    try:
+        import os as _os
+        from PyQt6.QtGui import QIcon as _QIcon
+        _icon = _os.path.join(app_dir(), "assets", "icon.svg")
+        if _os.path.exists(_icon):
+            app.setWindowIcon(_QIcon(_icon))
+    except Exception:
+        pass
 
     if not __import__("PyQt6.QtWidgets", fromlist=["QSystemTrayIcon"]).QSystemTrayIcon.isSystemTrayAvailable():
         print("Warning: no system tray detected — panel will still work.", file=sys.stderr)
