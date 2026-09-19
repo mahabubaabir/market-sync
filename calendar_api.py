@@ -19,7 +19,7 @@ FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", APP_ID)
 CACHE_PATH = os.path.join(CACHE_DIR, "calendar.json")
 
-IMPACT_RANK = {"High": 3, "Medium": 2, "Low": 1, "Holiday": 0, "": 0}
+IMPACT_RANK = {"All": 0, "High": 3, "Medium": 2, "Low": 1, "Holiday": 0, "": 0}
 
 
 def _parse_date(raw: str) -> datetime | None:

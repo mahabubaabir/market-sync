@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Tokyo / Torii Gate Landmark -->
+  <!-- Upper curved roof beam (Kasagi & Shimaki) -->
+  <path d="M 6,18 C 20,15 44,15 58,18 L 56,22 C 44,20 20,20 8,22 Z" fill="#ff6b6b"/>
+  <!-- Second horizontal beam (Nuki) extending past posts -->
+  <rect x="10" y="27" width="44" height="4" rx="1" fill="#ef4444"/>
+  <!-- Small central vertical block (Gakuzuka) -->
+  <rect x="30" y="22" width="4" height="5" fill="#dc2626"/>
+  <!-- Main pillars (Hashira) angled slightly inward -->
+  <polygon points="17,22 21,22 19,56 15,56" fill="#ef4444"/>
+  <polygon points="43,22 47,22 49,56 45,56" fill="#ef4444"/>
+  <!-- Base foundation stones (Nemaki) -->
+  <rect x="13" y="54" width="8" height="4" rx="1.5" fill="#78716c"/>
+  <rect x="43" y="54" width="8" height="4" rx="1.5" fill="#78716c"/>
+</svg>

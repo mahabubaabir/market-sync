@@ -4,6 +4,27 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.2.0 — 2026-09-19 — v0.2 glass design port
+The standalone app now wears the original Market Sync v0.2 design language:
+- **Glassmorphism**: translucent frosted panel + cards (pure rgba translucency —
+  no blur/shadow effects, so it stays crash-safe on Cinnamon)
+- **Landmark vector badges**: London Eye, Statue of Liberty, Sydney Opera
+  House, Torii Gate (SVGs from v0.2, rendered via QtSvg) on cards, hero, and
+  tray menu icons
+- **Market cards**: 2-column glass grid — top row landmark + symbol + local
+  clock, bottom row signed countdown (+open / −closed) + OPEN/CLOSED pill +
+  mini progress ring; click a card to select that market
+- **Active-session brightening**: open sessions glow neon green, closed ones
+  dim to muted slate; card borders follow open/closed state
+- **Signed countdowns**: tray shows `LON +02:14:33`, cards show `+ 05:18`
+- **Impact chips**: [All] [🟡 Low] [🟠 Med] [🔴 High] — All includes holidays;
+  Low/Med/High hide them (old v0.2 yellow/orange/red palette)
+- **Brand bar**: logo + letter-spaced MARKET SYNC title, v0.2 style
+- System theme now resolves light/dark properly (fallback dark, like v0.2)
+- London symbol LDN → LON (v0.2 parity); panel slimmed to ~670px for 768p
+- All v1.1 features kept: auto-update, autostart toggle, 6 themes, quit,
+  auto-hide, single instance
+
 ### v1.1.0 — 2026-09-19 — renamed to Market Sync
 - Full rename to match the repository: app name "Session Sync" → **Market Sync**;
   package, launcher and paths `session-sync` → `market-sync`

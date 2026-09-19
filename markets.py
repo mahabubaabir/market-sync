@@ -211,6 +211,17 @@ def format_countdown(td: timedelta) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 
+def format_signed_countdown(td: timedelta, is_open: bool, include_seconds: bool = False) -> str:
+    """Market Sync card style: '+ 05:18' while open, '- 23:42' while closed."""
+    secs = max(0, int(td.total_seconds()))
+    h, rem = divmod(secs, 3600)
+    m, s = divmod(rem, 60)
+    sign = "+" if is_open else "-"
+    if include_seconds:
+        return f"{sign} {h:02d}:{m:02d}:{s:02d}"
+    return f"{sign} {h:02d}:{m:02d}"
+
+
 def format_clock(dt: datetime, time_mode: str = "market_local") -> str:
     # time_mode handled by caller for system tz; here just HH:MM:SS
     return dt.strftime("%H:%M:%S")

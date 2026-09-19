@@ -27,7 +27,10 @@ mkdir -p "$BUILD/DEBIAN" \
 for f in main.py config.py markets.py calendar_api.py notifier.py ui.py updater.py; do
   install -m 0644 "$f" "$BUILD/opt/$APP/$f"
 done
-install -m 0644 assets/icon.svg "$BUILD/opt/$APP/assets/icon.svg"
+# assets: app icon + brand logo + landmark vector badges
+for a in assets/*.svg; do
+  install -m 0644 "$a" "$BUILD/opt/$APP/assets/$(basename "$a")"
+done
 
 # --- icons: scalable SVG + rendered PNGs
 install -m 0644 assets/icon.svg "$BUILD/usr/share/icons/hicolor/scalable/apps/$APP.svg"

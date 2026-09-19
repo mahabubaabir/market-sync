@@ -7,7 +7,7 @@ from copy import deepcopy
 
 APP_NAME = "Market Sync"
 APP_ID = "market-sync"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 # GitHub repo used by the one-line installer + auto-update checker.
 # Change these two lines if you fork / rename the project.
@@ -36,6 +36,7 @@ MARKETS = [
         "id": "SYDNEY",
         "name": "Sydney",
         "symbol": "SYD",
+        "landmark": "sydney",
         "flag": "🇦🇺",
         "tz": "Australia/Sydney",
         "open": "07:00",
@@ -48,6 +49,7 @@ MARKETS = [
         "id": "TOKYO",
         "name": "Tokyo",
         "symbol": "TYO",
+        "landmark": "tokyo",
         "flag": "🇯🇵",
         "tz": "Asia/Tokyo",
         "open": "09:00",
@@ -59,7 +61,8 @@ MARKETS = [
     {
         "id": "LONDON",
         "name": "London",
-        "symbol": "LDN",
+        "symbol": "LON",
+        "landmark": "london",
         "flag": "🇬🇧",
         "tz": "Europe/London",
         "open": "08:00",
@@ -72,6 +75,7 @@ MARKETS = [
         "id": "NEW_YORK",
         "name": "New York (FX)",
         "symbol": "NYC",
+        "landmark": "new_york",
         "flag": "🇺🇸",
         "tz": "America/New_York",
         "open": "08:00",
@@ -84,6 +88,7 @@ MARKETS = [
         "id": "NYSE",
         "name": "NYSE",
         "symbol": "NYSE",
+        "landmark": "new_york",
         "flag": "🗽",
         "tz": "America/New_York",
         "open": "09:30",
@@ -97,7 +102,7 @@ MARKETS = [
 
 MARKET_IDS = [m["id"] for m in MARKETS]
 
-IMPACT_LEVELS = ["Low", "Medium", "High"]
+IMPACT_LEVELS = ["All", "Low", "Medium", "High"]
 ALL_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD"]
 
 DEFAULT_SETTINGS = {
@@ -106,7 +111,7 @@ DEFAULT_SETTINGS = {
     # Both times are ALWAYS shown; this only flips which one is on top.
     "time_mode": "market_local",  # market_local | local
     "currencies": ["USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD"],
-    "min_impact": "Low",  # Low | Medium | High
+    "min_impact": "All",  # All | Low | Medium | High  (All includes holidays)
     "alerts_enabled": True,
     "alert_minutes_before": 5,
     "news_refresh_minutes": 15,
@@ -173,8 +178,8 @@ def load_settings() -> dict:
                     settings[k] = v
             if settings["selected_market"] not in MARKET_IDS:
                 settings["selected_market"] = "LONDON"
-            if settings.get("min_impact") not in ("Low", "Medium", "High"):
-                settings["min_impact"] = "Low"
+            if settings.get("min_impact") not in ("All", "Low", "Medium", "High"):
+                settings["min_impact"] = "All"
             if settings.get("theme") not in (
                 "system", "light", "dark", "dark_purple", "mint_light", "mint_dark"
             ):

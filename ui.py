@@ -1,6 +1,9 @@
-"""Market Sync — Market Countdown + News for Linux Mint (Cinnamon tray).
+"""Market Sync — glassmorphism market countdown + news (Cinnamon tray).
 
-Safe, resource-efficient tray app with left-click panel and right-click menu.
+Design language ported from Market Sync v0.2: frosted translucent cards,
+landmark vector badges (London Eye, Statue of Liberty, Sydney Opera House,
+Torii Gate), signed countdowns (+open / -closed), active-session brightening,
+and multi-impact news chips [All] [🔴 High] [🟠 Med] [🟡 Low].
 """
 from __future__ import annotations
 from datetime import datetime, timezone
@@ -12,18 +15,24 @@ try:
     from PyQt6.QtWidgets import (
         QApplication, QWidget, QSystemTrayIcon, QMenu,
         QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea,
-        QFrame, QCheckBox,
+        QFrame, QCheckBox, QGridLayout,
     )
     from PyQt6.QtGui import (
         QIcon, QPixmap, QPainter, QColor, QFont, QAction, QActionGroup,
         QFontMetrics, QPen, QCursor,
     )
-    from PyQt6.QtCore import QTimer, Qt, QRectF, QEvent
+    from PyQt6.QtCore import QTimer, Qt, QRectF, QEvent, pyqtSignal
     HAS_QT = True
 except ImportError:
     HAS_QT = False
     QWidget = object  # type: ignore
     QSystemTrayIcon = object  # type: ignore
+
+try:
+    from PyQt6.QtSvg import QSvgRenderer
+    HAS_SVG = True
+except ImportError:
+    HAS_SVG = False
 
 from config import (
     MARKETS, get_market, ALL_CURRENCIES, is_autostart_enabled,
@@ -35,40 +44,110 @@ import calendar_api
 import updater
 from notifier import notify, AlertTracker
 
-ACCENT = "#0071e3"  # default/macOS blue (fallback only; themes define accent)
-GREEN = "#30d158"   # macOS green
-RED = "#ff453a"
+ACCENT = "#0071e3"   # fallback accent (themes define their own)
+GREEN = "#30d158"    # active session neon green
+RED = "#ff453a"      # closed session countdown red
 
+ASSETS_DIR = os.path.join(app_dir(), "assets")
+
+# ------------------------------------------------------------ glass themes
+# Tokens follow the v0.2 Material-glass design: translucent panel + cards,
+# brighter card + green border while a session is open, dimmed while closed.
 THEMES = {
     "light": {
-        "bg": "#f5f5f7", "card": "#ffffff", "tint": "#e8f1fc",
-        "border": "#e2e2e6", "text": "#1d1d1f", "muted": "#6e6e73",
-        "tab_checked_bg": "#e8f1fc", "row_hover": "#f5f5f7",
-        "tray_text": "#1d1d1f", "accent": "#0071e3",
+        "bg": "rgba(250, 252, 255, 0.90)",
+        "glass_border": "rgba(255, 255, 255, 0.65)",
+        "card": "rgba(255, 255, 255, 0.92)",
+        "tint": "rgba(232, 241, 252, 0.90)",
+        "border": "rgba(0, 0, 0, 0.08)",
+        "text": "#1d1d1f", "muted": "#6e6e73",
+        "accent": "#0071e3",
+        "card_open": "rgba(255, 255, 255, 0.95)",
+        "card_closed": "rgba(243, 246, 250, 0.80)",
+        "card_border_open": "rgba(34, 197, 94, 0.60)",
+        "card_border_closed": "rgba(0, 0, 0, 0.08)",
+        "pill_open_bg": "rgba(34, 197, 94, 0.16)", "pill_open_text": "#16a34a",
+        "pill_closed_bg": "rgba(100, 116, 139, 0.12)", "pill_closed_text": "#64748b",
+        "ring_track": "rgba(0, 0, 0, 0.08)",
+        "badge_bg": "rgba(241, 245, 249, 0.85)",
+        "tab_checked_bg": "#e8f1fc",
+        "tray_text": "#1d1d1f",
     },
     "dark": {
-        "bg": "#23262b", "card": "#2e3238", "tint": "#25324a",
-        "border": "#3d434b", "text": "#e8eaed", "muted": "#9aa0a6",
-        "tab_checked_bg": "#353b44", "row_hover": "#353b44",
-        "tray_text": "#ffffff", "accent": "#0a84ff",
+        "bg": "rgba(16, 20, 30, 0.88)",
+        "glass_border": "rgba(255, 255, 255, 0.12)",
+        "card": "rgba(26, 34, 52, 0.85)",
+        "tint": "rgba(37, 50, 74, 0.85)",
+        "border": "rgba(255, 255, 255, 0.10)",
+        "text": "#e8eaed", "muted": "#9aa0a6",
+        "accent": "#0a84ff",
+        "card_open": "rgba(26, 34, 52, 0.90)",
+        "card_closed": "rgba(20, 24, 36, 0.65)",
+        "card_border_open": "rgba(48, 209, 88, 0.55)",
+        "card_border_closed": "rgba(255, 255, 255, 0.08)",
+        "pill_open_bg": "rgba(34, 197, 94, 0.22)", "pill_open_text": "#30d158",
+        "pill_closed_bg": "rgba(148, 163, 184, 0.12)", "pill_closed_text": "#94a3b8",
+        "ring_track": "rgba(255, 255, 255, 0.10)",
+        "badge_bg": "rgba(34, 40, 58, 0.85)",
+        "tab_checked_bg": "#353b44",
+        "tray_text": "#ffffff",
     },
     "dark_purple": {
-        "bg": "#1b1626", "card": "#241d33", "tint": "#2b2145",
-        "border": "#3a2f52", "text": "#ece7f6", "muted": "#9d94b8",
-        "tab_checked_bg": "#322750", "row_hover": "#2b2145",
-        "tray_text": "#ece7f6", "accent": "#a78bfa",
+        "bg": "rgba(23, 18, 34, 0.88)",
+        "glass_border": "rgba(255, 255, 255, 0.12)",
+        "card": "rgba(36, 29, 51, 0.85)",
+        "tint": "rgba(45, 36, 71, 0.85)",
+        "border": "rgba(255, 255, 255, 0.10)",
+        "text": "#ece7f6", "muted": "#9d94b8",
+        "accent": "#a78bfa",
+        "card_open": "rgba(38, 30, 56, 0.92)",
+        "card_closed": "rgba(26, 20, 39, 0.65)",
+        "card_border_open": "rgba(48, 209, 88, 0.55)",
+        "card_border_closed": "rgba(255, 255, 255, 0.08)",
+        "pill_open_bg": "rgba(34, 197, 94, 0.22)", "pill_open_text": "#30d158",
+        "pill_closed_bg": "rgba(148, 163, 184, 0.12)", "pill_closed_text": "#9d94b8",
+        "ring_track": "rgba(255, 255, 255, 0.10)",
+        "badge_bg": "rgba(46, 36, 66, 0.85)",
+        "tab_checked_bg": "#322750",
+        "tray_text": "#ece7f6",
     },
     "mint_light": {
-        "bg": "#f2faf5", "card": "#ffffff", "tint": "#e2f5ea",
-        "border": "#d5e8dd", "text": "#1c2b23", "muted": "#5f7a6c",
-        "tab_checked_bg": "#e2f5ea", "row_hover": "#eef8f2",
-        "tray_text": "#1c2b23", "accent": "#10b981",
+        "bg": "rgba(242, 250, 245, 0.90)",
+        "glass_border": "rgba(255, 255, 255, 0.65)",
+        "card": "rgba(255, 255, 255, 0.92)",
+        "tint": "rgba(226, 245, 234, 0.90)",
+        "border": "rgba(16, 43, 35, 0.08)",
+        "text": "#1c2b23", "muted": "#5f7a6c",
+        "accent": "#10b981",
+        "card_open": "rgba(255, 255, 255, 0.95)",
+        "card_closed": "rgba(238, 248, 242, 0.80)",
+        "card_border_open": "rgba(16, 185, 129, 0.60)",
+        "card_border_closed": "rgba(16, 43, 35, 0.08)",
+        "pill_open_bg": "rgba(16, 185, 129, 0.16)", "pill_open_text": "#059669",
+        "pill_closed_bg": "rgba(100, 116, 139, 0.12)", "pill_closed_text": "#5f7a6c",
+        "ring_track": "rgba(16, 43, 35, 0.08)",
+        "badge_bg": "rgba(226, 245, 234, 0.85)",
+        "tab_checked_bg": "#e2f5ea",
+        "tray_text": "#1c2b23",
     },
     "mint_dark": {
-        "bg": "#16211c", "card": "#1f2d26", "tint": "#243b30",
-        "border": "#2f4a3d", "text": "#e3f0e9", "muted": "#8fae9e",
-        "tab_checked_bg": "#2a4538", "row_hover": "#243b30",
-        "tray_text": "#e3f0e9", "accent": "#35c48d",
+        "bg": "rgba(18, 29, 24, 0.88)",
+        "glass_border": "rgba(255, 255, 255, 0.12)",
+        "card": "rgba(31, 45, 38, 0.85)",
+        "tint": "rgba(36, 59, 48, 0.85)",
+        "border": "rgba(255, 255, 255, 0.10)",
+        "text": "#e3f0e9", "muted": "#8fae9e",
+        "accent": "#35c48d",
+        "card_open": "rgba(33, 50, 41, 0.92)",
+        "card_closed": "rgba(22, 33, 27, 0.65)",
+        "card_border_open": "rgba(53, 196, 141, 0.55)",
+        "card_border_closed": "rgba(255, 255, 255, 0.08)",
+        "pill_open_bg": "rgba(53, 196, 141, 0.22)", "pill_open_text": "#35c48d",
+        "pill_closed_bg": "rgba(148, 163, 184, 0.12)", "pill_closed_text": "#8fae9e",
+        "ring_track": "rgba(255, 255, 255, 0.10)",
+        "badge_bg": "rgba(36, 54, 44, 0.85)",
+        "tab_checked_bg": "#2a4538",
+        "tray_text": "#e3f0e9",
     },
 }
 
@@ -91,7 +170,10 @@ THEME_ICON = {
     "mint_dark": "🍃",
 }
 
-IMPACT_COLOR = {"High": "#ff453a", "Medium": "#ff9f0a", "Low": "#8e8e93", "Holiday": "#bf5af2"}
+# v0.2 impact palette: High red, Medium orange, Low yellow, Holiday purple.
+IMPACT_COLOR = {"High": "#ff453a", "Medium": "#ff9f0a", "Low": "#ffd60a", "Holiday": "#bf5af2"}
+CHIP_COLOR = {"All": None, "Low": "#ffd60a", "Medium": "#ff9f0a", "High": "#ff453a"}
+CHIP_LABEL = {"All": "All", "Low": "🟡 Low", "Medium": "🟠 Med", "High": "🔴 High"}
 
 # Sentinel: distinguishes "update check not finished yet" from "no update".
 _UNSET = object()
@@ -100,7 +182,7 @@ _UNSET = object()
 def resolve_theme(want: str) -> str:
     if want in THEMES:
         return want
-    # system: ask Qt when available, else light (matches App Store screenshots)
+    # system: ask Qt when available, else dark (v0.2 default)
     if HAS_QT:
         try:
             from PyQt6.QtWidgets import QApplication
@@ -110,27 +192,26 @@ def resolve_theme(want: str) -> str:
                 scheme = app.styleHints().colorScheme()
                 if scheme == _Qt.ColorScheme.Dark:
                     return "dark"
+                if scheme == _Qt.ColorScheme.Light:
+                    return "light"
         except Exception:
             pass
-    return "light"
+    return "dark"
 
 
 def stylesheet(t: dict) -> str:
     return f"""
-QWidget#PanelRoot {{ background: {t['bg']}; border: 1px solid {t['border']}; border-radius: 14px; }}
+QWidget#PanelRoot {{
+    background: {t['bg']};
+    border: 1px solid {t['glass_border']};
+    border-radius: 18px;
+}}
 QLabel {{ color: {t['text']}; background: transparent; }}
 QLabel.muted {{ color: {t['muted']}; font-size: 11px; }}
 QLabel.caption {{ color: {t['muted']}; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; }}
-QLabel.hero {{ font-size: 30px; font-weight: 800; letter-spacing: 0.5px; }}
-QLabel.pill-open {{ background: {GREEN}; color: white; border-radius: 9px; padding: 2px 10px; font-weight: 800; font-size: 11px; }}
-QLabel.pill-closed {{ background: #8e8e93; color: white; border-radius: 9px; padding: 2px 10px; font-weight: 800; font-size: 11px; }}
-QLabel.nextcard {{ background: {t['tint']}; border: 1px solid {t['accent']}; border-radius: 10px; padding: 8px 10px; }}
+QLabel.cd {{ font-family: monospace; font-weight: 800; }}
+QLabel.nextcard {{ background: {t['tint']}; border: 1px solid {t['border']}; border-radius: 10px; padding: 8px 10px; }}
 QFrame.card {{ background: {t['card']}; border: 1px solid {t['border']}; border-radius: 12px; }}
-QPushButton.tab {{ background: transparent; color: {t['text']}; border: 1px solid transparent; border-radius: 9px; padding: 6px 2px; font-weight: 700; font-size: 12px; }}
-QPushButton.tab:checked {{ background: {t['tab_checked_bg']}; border: 1px solid {t['accent']}; color: {t['text']}; }}
-QPushButton.filter {{ background: transparent; color: {t['muted']}; border: 1px solid {t['border']}; border-radius: 8px; padding: 3px 8px; font-size: 11px; font-weight: 700; }}
-QPushButton.filter:checked {{ background: {t['tab_checked_bg']}; border: 1px solid {t['accent']}; color: {t['text']}; }}
-QLabel.mktrow {{ background: transparent; border: none; padding: 4px 6px; font-size: 12px; }}
 QPushButton.ghost {{ background: transparent; color: {t['muted']}; border: 1px solid {t['border']}; border-radius: 7px; padding: 4px 10px; font-size: 12px; }}
 QPushButton.ghost:hover {{ color: {t['text']}; border-color: {t['accent']}; }}
 QPushButton.quitbtn {{ background: #ff453a; color: white; border: none; border-radius: 7px; padding: 5px 12px; font-size: 12px; font-weight: 800; }}
@@ -144,16 +225,15 @@ QMenu {{ background: {t['card']}; color: {t['text']}; border: 1px solid {t['bord
 
 
 # ---------------------------------------------------------------- tray text
-# macOS shows TEXT in the menu bar ("LDN 02:14:33"), not an icon — we render
-# the same text into a wide transparent pixmap for the Cinnamon tray.
-
+# Ultra-compact tray: 3-letter symbol + countdown (LON +02:14:33 …)
 def tray_label_text(selected: dict, nxt, settings: dict, now_utc) -> str:
     m = selected["market"]
     parts: list[str] = []
     if settings.get("show_symbol", True):
         parts.append(m["symbol"])
     if settings.get("show_countdown", True):
-        parts.append(engine.format_countdown(selected["countdown"]))
+        parts.append(engine.format_signed_countdown(
+            selected["countdown"], selected["is_open"], include_seconds=True).replace(" ", ""))
     if settings.get("show_local_time", True):
         parts.append(selected["now_local"].strftime("%H:%M"))
     text = " ".join(parts) or m["symbol"]
@@ -178,7 +258,7 @@ def make_tray_icon(text: str, is_open: bool, theme: str) -> "QIcon":
     p.setFont(font)
     p.setBrush(QColor(GREEN if is_open else "#8e8e93"))
     p.setPen(Qt.PenStyle.NoPen)
-    p.drawEllipse(2, 8, 12, 12)  # status dot like the mac status indicator
+    p.drawEllipse(2, 8, 12, 12)  # status dot
     p.setPen(QColor(t["tray_text"]))
     p.drawText(20, 0, w - 20, 28, Qt.AlignmentFlag.AlignVCenter, text)
     p.end()
@@ -198,7 +278,6 @@ def _next_nyse_holiday_line(now_utc=None) -> str:
     from zoneinfo import ZoneInfo
     from markets import nyse_holidays
     now_utc = now_utc or datetime.now(timezone.utc)
-    # simple scan using NY calendar
     try:
         ny = ZoneInfo("America/New_York")
         base = now_utc.astimezone(ny)
@@ -211,13 +290,30 @@ def _next_nyse_holiday_line(now_utc=None) -> str:
         return ""
 
 
-# ---------------------------------------------------------------- panel
+def _svg_path(landmark: str) -> str:
+    return os.path.join(ASSETS_DIR, f"{landmark}.svg")
+
+
+def landmark_menu_icon(market: dict, size: int = 16) -> "QIcon":
+    pm = QPixmap(size, size)
+    pm.fill(Qt.GlobalColor.transparent)
+    path = _svg_path(market.get("landmark", "london"))
+    if HAS_SVG and os.path.exists(path):
+        r = QSvgRenderer(path)
+        p = QPainter(pm)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        r.render(p)
+        p.end()
+    return QIcon(pm)
+
+
+# ---------------------------------------------------------------- widgets
 
 if HAS_QT:
     class RingTimer(QWidget):
-        """Lightweight circular progress ring - no shadow effects."""
+        """Hero progress ring — neon green while open, red while closed."""
 
-        def __init__(self, size: int = 104):
+        def __init__(self, size: int = 64):
             super().__init__()
             self._frac = 0.0
             self._open = False
@@ -231,30 +327,203 @@ if HAS_QT:
         def paintEvent(self, _ev):
             p = QPainter(self)
             p.setRenderHint(QPainter.RenderHint.Antialiasing)
-            theme = THEMES.get(getattr(self, "_theme", "light"), THEMES["light"])
-            rect = QRectF(8, 8, self.width() - 16, self.height() - 16)
-            p.setPen(QPen(QColor(theme["border"]), 9, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            theme = THEMES.get(getattr(self, "_theme", "dark"), THEMES["dark"])
+            w = 7
+            rect = QRectF(w, w, self.width() - 2 * w, self.height() - 2 * w)
+            p.setPen(QPen(QColor(theme["ring_track"]), w, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
             p.drawArc(rect, 0, 360 * 16)
-            col = theme.get("accent", ACCENT) if self._open else theme["muted"]
-            p.setPen(QPen(QColor(col), 9, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            p.setPen(QPen(QColor(GREEN if self._open else RED), w,
+                          Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
             p.drawArc(rect, 90 * 16, -int(self._frac * 360 * 16))
-            p.setPen(QColor(theme["text"]))
-            p.setFont(QFont("Sans", 13, QFont.Weight.Bold))
-            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, f"{int(self._frac * 100)}%")
             p.end()
 else:
-    class RingTimer:
+    class RingTimer:  # type: ignore
+        def __init__(self, *a, **k):
+            raise RuntimeError("PyQt6 required for UI")
+
+
+if HAS_QT:
+    class LandmarkBadge(QWidget):
+        """Circular glass badge with the market's landmark SVG (v0.2 style)."""
+
+        def __init__(self, landmark: str, symbol: str, size: int = 26):
+            super().__init__()
+            self._landmark = landmark
+            self._symbol = symbol
+            self._size = size
+            self.setFixedSize(size, size)
+            self._bg = QColor("rgba(241, 245, 249, 0.85)")
+
+        def set_landmark(self, landmark: str, symbol: str):
+            if landmark != self._landmark or symbol != self._symbol:
+                self._landmark, self._symbol = landmark, symbol
+                self.update()
+
+        def set_theme(self, t: dict):
+            self._bg = QColor(t["badge_bg"])
+            self.update()
+
+        def paintEvent(self, _ev):
+            p = QPainter(self)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(self._bg)
+            p.drawEllipse(1, 1, self._size - 2, self._size - 2)
+            path = _svg_path(self._landmark)
+            if HAS_SVG and os.path.exists(path):
+                r = QSvgRenderer(path)
+                inset = max(4, self._size // 6)
+                r.render(p, QRectF(inset, inset, self._size - 2 * inset, self._size - 2 * inset))
+            else:
+                # fallback: symbol initials inside the circle
+                p.setPen(QColor("#ffffff"))
+                f = QFont("Sans", max(7, self._size // 3), QFont.Weight.Bold)
+                p.setFont(f)
+                p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self._symbol[:3])
+            p.end()
+else:
+    class LandmarkBadge:  # type: ignore
+        def __init__(self, *a, **k):
+            raise RuntimeError("PyQt6 required for UI")
+
+
+if HAS_QT:
+    class MiniRingTimer(QWidget):
+        """Small progress ring beside the OPEN/CLOSED pill on market cards."""
+
+        def __init__(self, size: int = 16):
+            super().__init__()
+            self.setFixedSize(size, size)
+            self._frac = 0.0
+            self._open = False
+            self._track = QColor("rgba(255, 255, 255, 0.1)")
+
+        def set_state(self, frac: float, is_open: bool, t: dict):
+            self._frac = min(1.0, max(0.0, frac))
+            self._open = is_open
+            self._track = QColor(t["ring_track"])
+            self.update()
+
+        def paintEvent(self, _ev):
+            p = QPainter(self)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            w = 2.5
+            rect = QRectF(w, w, self.width() - 2 * w, self.height() - 2 * w)
+            p.setPen(QPen(self._track, w, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            p.drawArc(rect, 0, 360 * 16)
+            p.setPen(QPen(QColor(GREEN if self._open else RED), w,
+                          Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            span = int(-self._frac * 360 * 16)
+            if abs(span) > 16:
+                p.drawArc(rect, 90 * 16, span)
+            p.end()
+else:
+    class MiniRingTimer:  # type: ignore
+        def __init__(self, *a, **k):
+            raise RuntimeError("PyQt6 required for UI")
+
+
+if HAS_QT:
+    class MarketCardWidget(QFrame):
+        """v0.2 Material glass card: bright while open, dimmed while closed.
+
+        Top row:    landmark badge • symbol • local clock
+        Bottom row: signed countdown (+open/-closed) • pill • mini ring
+        """
+
+        clicked = pyqtSignal(str)
+
+        def __init__(self, market: dict, parent: QWidget | None = None):
+            super().__init__(parent)
+            self.market = market
+            self.setObjectName("MarketCard")
+            self.setFixedHeight(58)
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+            lay = QVBoxLayout(self)
+            lay.setContentsMargins(10, 5, 10, 5)
+            lay.setSpacing(2)
+
+            top = QHBoxLayout()
+            top.setSpacing(6)
+            self.badge = LandmarkBadge(market.get("landmark", "london"), market["symbol"], 22)
+            top.addWidget(self.badge)
+            self.name_label = QLabel(market["symbol"])
+            self.name_label.setStyleSheet("font-weight: 800; font-size: 12px;")
+            top.addWidget(self.name_label)
+            top.addStretch(1)
+            self.time_label = QLabel("00:00")
+            self.time_label.setStyleSheet("font-size: 11px;")
+            top.addWidget(self.time_label)
+            lay.addLayout(top)
+
+            bot = QHBoxLayout()
+            bot.setSpacing(5)
+            self.cd_label = QLabel("+ 00:00")
+            self.cd_label.setProperty("class", "cd")
+            self.cd_label.setStyleSheet("font-family: monospace; font-size: 14px; font-weight: 800;")
+            bot.addWidget(self.cd_label)
+            bot.addStretch(1)
+            self.pill = QLabel("OPEN")
+            self.pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.pill.setFixedSize(54, 17)
+            f = QFont("Sans", 8)
+            f.setWeight(QFont.Weight.Bold)
+            self.pill.setFont(f)
+            bot.addWidget(self.pill)
+            self.ring = MiniRingTimer(16)
+            bot.addWidget(self.ring)
+            lay.addLayout(bot)
+
+        def mousePressEvent(self, ev):
+            if ev.button() == Qt.MouseButton.LeftButton:
+                self.clicked.emit(self.market["id"])
+            super().mousePressEvent(ev)
+
+        def update_data(self, status: dict, t: dict, selected: bool):
+            m = self.market
+            is_open = bool(status["is_open"])
+            self.badge.set_theme(t)
+            self.time_label.setText(status["now_local"].strftime("%H:%M"))
+            self.time_label.setStyleSheet(f"font-size: 11px; color: {t['muted']};")
+            self.cd_label.setText(engine.format_signed_countdown(status["countdown"], is_open))
+            # Active-session brightening (v0.2): neon green vs muted slate
+            if is_open:
+                self.cd_label.setStyleSheet(
+                    f"font-family: monospace; font-size: 14px; font-weight: 800; color: {GREEN};")
+                self.name_label.setStyleSheet("font-weight: 800; font-size: 12px;")
+                self.pill.setText("OPEN")
+                self.pill.setStyleSheet(
+                    f"background: {t['pill_open_bg']}; color: {t['pill_open_text']};"
+                    "border-radius: 5px; font-weight: bold;")
+                bg, bd = t["card_open"], t["card_border_open"]
+            else:
+                self.cd_label.setStyleSheet(
+                    f"font-family: monospace; font-size: 14px; font-weight: 800; color: {t['muted']};")
+                self.name_label.setStyleSheet(f"font-weight: 800; font-size: 12px; color: {t['muted']};")
+                self.pill.setText("CLOSED")
+                self.pill.setStyleSheet(
+                    f"background: {t['pill_closed_bg']}; color: {t['pill_closed_text']};"
+                    "border-radius: 5px; font-weight: bold;")
+                bg, bd = t["card_closed"], t["card_border_closed"]
+            bw = "1.5px" if selected else ("1.5px" if is_open else "1px")
+            bcol = t["accent"] if selected else bd
+            self.setStyleSheet(
+                f"QFrame#MarketCard {{ background: {bg}; border: {bw} solid {bcol}; border-radius: 12px; }}")
+            self.ring.set_state(status.get("progress", 0.0), is_open, t)
+else:
+    class MarketCardWidget:  # type: ignore
         def __init__(self, *a, **k):
             raise RuntimeError("PyQt6 required for UI")
 
 
 class SessionPanel(QWidget):
-    """Compact market countdown panel (~340px). Lightweight rendering."""
+    """Market Sync glass popover: brand bar, hero, market cards, news chips."""
 
     def __init__(self, controller: "TrayController"):
         super().__init__()
         self.c = controller
-        self._theme = "light"
+        self._theme = "dark"
         self.setObjectName("PanelRoot")
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
@@ -265,82 +534,87 @@ class SessionPanel(QWidget):
         self.setFixedWidth(344)
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(12, 10, 12, 10)
+        root.setContentsMargins(10, 8, 10, 8)
         root.setSpacing(8)
 
-        # — top bar: title + close. Close (hide) is here so left-click
-        # always gives you a visible way out without hunting the tray.
-        top = QHBoxLayout()
-        self.title = QLabel("Market Countdown")
-        self.title.setStyleSheet("font-weight:800; font-size:13px;")
-        top.addWidget(self.title)
-        top.addStretch(1)
+        # ---- brand bar: logo + MARKET SYNC + controls (v0.2 BrandBar)
+        brand = QHBoxLayout()
+        brand.setSpacing(6)
+        self.logo = QLabel()
+        self.logo.setFixedSize(20, 20)
+        logo_pm = QPixmap(20, 20)
+        logo_pm.fill(Qt.GlobalColor.transparent)
+        logo_path = os.path.join(ASSETS_DIR, "logo.svg")
+        if HAS_SVG and os.path.exists(logo_path):
+            r = QSvgRenderer(logo_path)
+            p = QPainter(logo_pm)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            r.render(p)
+            p.end()
+        self.logo.setPixmap(logo_pm)
+        brand.addWidget(self.logo)
+        self.title = QLabel("MARKET SYNC")
+        tf = QFont("Sans", 9, QFont.Weight.Bold)
+        tf.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.2)
+        self.title.setFont(tf)
+        self.title.setStyleSheet("font-weight: 800;")
+        brand.addWidget(self.title)
+        brand.addStretch(1)
         self.theme_btn = QPushButton("🌙")
         self.theme_btn.setProperty("class", "ghost")
         self.theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.theme_btn.setToolTip("Toggle light / dark / system")
         self.theme_btn.clicked.connect(self.c.cycle_theme)
-        top.addWidget(self.theme_btn)
+        brand.addWidget(self.theme_btn)
         self.time_btn = QPushButton("")
         self.time_btn.setProperty("class", "ghost")
         self.time_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.time_btn.setToolTip("Flip which clock is emphasised (both always shown)")
         self.time_btn.clicked.connect(self.c.toggle_time_mode)
-        top.addWidget(self.time_btn)
+        brand.addWidget(self.time_btn)
         refresh = QPushButton("↻")
         refresh.setProperty("class", "ghost")
         refresh.setCursor(Qt.CursorShape.PointingHandCursor)
         refresh.setToolTip("Refresh news")
         refresh.clicked.connect(lambda: self.c.refresh_news(force=True))
-        top.addWidget(refresh)
+        brand.addWidget(refresh)
         self.close_btn = QPushButton("✕")
         self.close_btn.setProperty("class", "ghost")
         self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.close_btn.setToolTip("Hide panel (app keeps running in tray)")
         self.close_btn.clicked.connect(self.hide)
-        top.addWidget(self.close_btn)
-        root.addLayout(top)
+        brand.addWidget(self.close_btn)
+        root.addLayout(brand)
 
-        # — market tabs (the "Market Symbols" row)
-        tabs = QHBoxLayout()
-        tabs.setSpacing(4)
-        self.mkt_btns: dict[str, QPushButton] = {}
-        for m in MARKETS:
-            b = QPushButton(f"{m['flag']} {m['symbol']}")
-            b.setCheckable(True)
-            b.setProperty("class", "tab")
-            b.setCursor(Qt.CursorShape.PointingHandCursor)
-            b.clicked.connect(lambda _=False, mid=m["id"]: self.c.select_market(mid))
-            tabs.addWidget(b, 1)
-            self.mkt_btns[m["id"]] = b
-        root.addLayout(tabs)
-
-        # — hero: ring + countdown + dual clocks (mac "visual timer")
+        # ---- hero: ring + landmark + signed countdown + dual clocks
         hero = QFrame()
         hero.setProperty("class", "card")
         hl = QHBoxLayout(hero)
         hl.setContentsMargins(12, 10, 12, 10)
-        hl.setSpacing(10)
-        self.ring = RingTimer(88)
+        hl.setSpacing(12)
+        self.ring = RingTimer(64)
         hl.addWidget(self.ring)
         hv = QVBoxLayout()
         hv.setSpacing(2)
+        hrow = QHBoxLayout()
+        hrow.setSpacing(6)
+        self.hero_badge = LandmarkBadge("london", "LON", 30)
+        hrow.addWidget(self.hero_badge)
         self.hero_name = QLabel("")
-        self.hero_name.setStyleSheet("font-size:14px; font-weight:800;")
-        hv.addWidget(self.hero_name)
+        self.hero_name.setStyleSheet("font-size: 14px; font-weight: 800;")
+        hrow.addWidget(self.hero_name)
         self.hero_pill = QLabel("")
-        prow = QHBoxLayout()
-        prow.setContentsMargins(0, 0, 0, 0)
-        prow.addWidget(self.hero_pill)
-        prow.addStretch(1)
-        hv.addLayout(prow)
-        self.hero_cd = QLabel("--:--:--")
-        self.hero_cd.setProperty("class", "hero")
-        self.hero_cd.setStyleSheet("font-family: monospace; font-size: 26px; font-weight: 800;")
+        self.hero_pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pf = QFont("Sans", 8, QFont.Weight.Bold)
+        self.hero_pill.setFont(pf)
+        hrow.addWidget(self.hero_pill)
+        hrow.addStretch(1)
+        hv.addLayout(hrow)
+        self.hero_cd = QLabel("+ 00:00:00")
+        self.hero_cd.setStyleSheet("font-family: monospace; font-size: 24px; font-weight: 800;")
         hv.addWidget(self.hero_cd)
         self.hero_at = QLabel("")
         self.hero_at.setProperty("class", "muted")
-        self.hero_at.setWordWrap(True)
         hv.addWidget(self.hero_at)
         self.hero_clocks = QLabel("")
         self.hero_clocks.setProperty("class", "muted")
@@ -349,27 +623,27 @@ class SessionPanel(QWidget):
         hl.addLayout(hv, 1)
         root.addWidget(hero)
 
-        # — markets section (open/close hours per market; QLabel renders rich text)
-        cap1 = QLabel("MARKETS")
-        cap1.setProperty("class", "caption")
-        root.addWidget(cap1)
-        self.sess_card = QFrame()
-        self.sess_card.setProperty("class", "card")
-        self.sess_box = QVBoxLayout(self.sess_card)
-        self.sess_box.setContentsMargins(6, 4, 6, 4)
-        self.sess_box.setSpacing(1)
-        self.sess_rows: dict[str, QLabel] = {}
-        for m in MARKETS:
-            row = QLabel("")
-            row.setProperty("class", "mktrow")
-            row.setWordWrap(True)
-            self.sess_box.addWidget(row)
-            self.sess_rows[m["id"]] = row
-        root.addWidget(self.sess_card)
+        # ---- market cards grid (v0.2: 2 columns, glass, bright/dim)
+        self.cards: dict[str, MarketCardWidget] = {}
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(6)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+        for idx, m in enumerate(MARKETS):
+            card = MarketCardWidget(m)
+            card.clicked.connect(self.c.select_market)
+            self.cards[m["id"]] = card
+            r, c = divmod(idx, 2)
+            if idx == len(MARKETS) - 1 and len(MARKETS) % 2 == 1:
+                grid.addWidget(card, r, 0, 1, 2)  # last card spans full width
+            else:
+                grid.addWidget(card, r, c)
+        root.addLayout(grid)
 
-        # — news section with impact filter (Low / Medium / High)
+        # ---- news: UP NEXT + impact chips (v0.2: All / High / Med / Low)
         caprow = QHBoxLayout()
-        cap2 = QLabel("UPCOMING EVENTS")
+        cap2 = QLabel("UP NEXT")
         cap2.setProperty("class", "caption")
         caprow.addWidget(cap2)
         caprow.addStretch(1)
@@ -378,19 +652,18 @@ class SessionPanel(QWidget):
         caprow.addWidget(self.news_src)
         root.addLayout(caprow)
 
-        filtrow = QHBoxLayout()
-        filtrow.setSpacing(4)
+        chips = QHBoxLayout()
+        chips.setSpacing(4)
         self.impact_btns: dict[str, QPushButton] = {}
-        for lvl, dot in (("Low", "⚪"), ("Medium", "🟡"), ("High", "🔴")):
-            b = QPushButton(f"{dot} {lvl}")
+        for lvl in ("All", "Low", "Medium", "High"):
+            b = QPushButton(CHIP_LABEL[lvl])
             b.setCheckable(True)
-            b.setProperty("class", "filter")
             b.setCursor(Qt.CursorShape.PointingHandCursor)
-            b.setToolTip(f"Minimum impact: {lvl} (Holiday news always hidden)")
+            b.setToolTip(f"Minimum impact: {lvl}" + (" (includes holidays)" if lvl == "All" else " (holidays hidden)"))
             b.clicked.connect(lambda _=False, lv=lvl: self.c.set_min_impact(lv))
-            filtrow.addWidget(b, 1)
+            chips.addWidget(b, 1)
             self.impact_btns[lvl] = b
-        root.addLayout(filtrow)
+        root.addLayout(chips)
 
         self.next_card = QLabel("Loading news…")
         self.next_card.setProperty("class", "nextcard")
@@ -399,7 +672,7 @@ class SessionPanel(QWidget):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setFixedHeight(132)
+        scroll.setFixedHeight(96)
         inner = QWidget()
         self.news_list = QVBoxLayout(inner)
         self.news_list.setSpacing(2)
@@ -415,7 +688,7 @@ class SessionPanel(QWidget):
         self.foot.setWordWrap(True)
         root.addWidget(self.foot)
 
-        # — bottom action row: Hide (close panel) + Quit (kill app) + startup
+        # ---- bottom action row: Hide + startup + Quit
         actionrow = QHBoxLayout()
         actionrow.setSpacing(6)
         self.hide_btn = QPushButton("Hide")
@@ -439,7 +712,6 @@ class SessionPanel(QWidget):
         self.apply_theme()
 
     # Panel must NOT stick over other apps: hide when it loses focus
-    # (Qt.Popup normally does this, but Cinnamon needs the explicit hook).
     def changeEvent(self, ev):
         try:
             if ev.type() == QEvent.Type.ActivationChange and not self.isActiveWindow():
@@ -458,29 +730,40 @@ class SessionPanel(QWidget):
         super().focusOutEvent(ev)
 
     def apply_theme(self):
-        # Single source of truth so tray icon + panel + menu never disagree.
         self._theme = resolve_theme(self.c.settings.get("theme", "system"))
-        self.setStyleSheet(stylesheet(THEMES[self._theme]))
+        t = THEMES[self._theme]
+        self.setStyleSheet(stylesheet(t))
         try:
-            self.c.menu.setStyleSheet(stylesheet(THEMES[self._theme]))
+            self.c.menu.setStyleSheet(stylesheet(t))
         except Exception:
             pass
         self.ring._theme = self._theme  # type: ignore
         want = self.c.settings.get("theme", "system")
         self.theme_btn.setText(THEME_ICON.get(want, "🖥️"))
         self.theme_btn.setToolTip(f"Theme: {THEME_LABELS.get(want, want)} (click to cycle)")
+        # chips: semantic colors, tinted when checked (works on light + dark)
+        for lvl, b in self.impact_btns.items():
+            base = CHIP_COLOR[lvl] or t["accent"]
+            c = QColor(base)
+            tint = f"rgba({c.red()}, {c.green()}, {c.blue()}, 51)"
+            b.setStyleSheet(
+                f"QPushButton {{ background: transparent; color: {t['muted']}; "
+                f"border: 1px solid {t['border']}; border-radius: 11px; "
+                f"padding: 3px 2px; font-size: 11px; font-weight: 700; }}"
+                f"QPushButton:checked {{ color: {base}; border-color: {base}; background: {tint}; }}")
 
     def render(self, statuses, selected, news, news_note, now_utc):
         if resolve_theme(self.c.settings.get("theme", "system")) != self._theme:
             self.apply_theme()
+        t = THEMES[self._theme]
         sel_id = self.c.settings["selected_market"]
-        for mid, b in self.mkt_btns.items():
-            b.setChecked(mid == sel_id)
-        # impact filter buttons reflect current minimum
-        cur_impact = self.c.settings.get("min_impact", "Low")
+
+        # impact chips reflect current minimum (All / Low / Med / High)
+        cur = self.c.settings.get("min_impact", "All")
         for lvl, b in self.impact_btns.items():
-            b.setChecked(lvl == cur_impact)
-        # autostart checkbox reflects real file state (not just settings)
+            b.setChecked(lvl == cur)
+
+        # autostart checkbox reflects real file state
         try:
             self.autostart_chk.blockSignals(True)
             self.autostart_chk.setChecked(is_autostart_enabled())
@@ -490,22 +773,30 @@ class SessionPanel(QWidget):
         tm = self.c.settings.get("time_mode", "market_local")
         self.time_btn.setText("🕒 Market first" if tm == "market_local" else "🕒 Mine first")
 
+        # ---- hero
         m = selected["market"]
-        cd = engine.format_countdown(selected["countdown"])
-        self.hero_name.setText(f"{m['flag']}  {m['name']}")
+        self.hero_badge.set_landmark(m.get("landmark", "london"), m["symbol"])
+        self.hero_badge.set_theme(t)
+        self.hero_name.setText(m["name"])
         if selected["is_open"]:
-            self.hero_pill.setText("● OPEN")
-            self.hero_pill.setProperty("class", "pill-open")
+            self.hero_pill.setText("OPEN")
+            self.hero_pill.setStyleSheet(
+                f"background: {t['pill_open_bg']}; color: {t['pill_open_text']};"
+                "border-radius: 5px; font-weight: bold; padding: 1px 8px;")
+            self.hero_cd.setStyleSheet(
+                f"font-family: monospace; font-size: 24px; font-weight: 800; color: {GREEN};")
         else:
-            self.hero_pill.setText("○ CLOSED")
-            self.hero_pill.setProperty("class", "pill-closed")
-        self.hero_pill.style().unpolish(self.hero_pill)
-        self.hero_pill.style().polish(self.hero_pill)
-        self.hero_cd.setText(cd)
+            self.hero_pill.setText("CLOSED")
+            self.hero_pill.setStyleSheet(
+                f"background: {t['pill_closed_bg']}; color: {t['pill_closed_text']};"
+                "border-radius: 5px; font-weight: bold; padding: 1px 8px;")
+            self.hero_cd.setStyleSheet(
+                f"font-family: monospace; font-size: 24px; font-weight: 800; color: {t['text']};")
+        self.hero_cd.setText(engine.format_signed_countdown(
+            selected["countdown"], selected["is_open"], include_seconds=True))
         self.ring.set(selected["progress"], selected["is_open"])
         at = selected["next_at_local"].strftime("%a %H:%M %Z")
         self.hero_at.setText(f"{'Closes' if selected['is_open'] else 'Opens'} {at}")
-        # CLEAR session understanding: label BOTH clocks with tz names.
         mkt_clock = selected["now_local"].strftime("%H:%M:%S %Z")
         yours = now_utc.astimezone().strftime("%H:%M:%S %Z")
         mkt_tz = m.get("tz", "")
@@ -514,19 +805,13 @@ class SessionPanel(QWidget):
         else:
             self.hero_clocks.setText(f"💻 Yours (laptop): {yours}<br>🏦 Market ({mkt_tz}): {mkt_clock}")
 
+        # ---- market cards (v0.2 brightening)
         for s in statuses:
-            mm = s["market"]
-            dot = "🟢" if s["is_open"] else "⚪"
-            mini = engine.format_countdown(s["countdown"])
-            verb = "Closes" if s["is_open"] else "Opens"
-            hours = f"{mm['open']}–{mm['close']}"
-            sel = "  ←" if mm["id"] == sel_id else ""
-            self.sess_rows[mm["id"]].setText(
-                f"{dot}  <b>{mm['symbol']}</b> {mm['name']}{sel}"
-                f"<br><font color='{THEMES[self._theme]['muted']}'>&nbsp;&nbsp;&nbsp;&nbsp;"
-                f"{hours} • {verb} in {mini}</font>"
-            )
+            mid = s["market"]["id"]
+            if mid in self.cards:
+                self.cards[mid].update_data(s, t, selected=(mid == sel_id))
 
+        # ---- news
         self.news_src.setText(news_note)
         nxt = calendar_api.next_event(
             news, self.c.settings["currencies"], self.c.settings["min_impact"], now_utc
@@ -538,13 +823,11 @@ class SessionPanel(QWidget):
             self.next_card.setText(
                 f"NEXT  <b>{nxt['currency']}</b>  <font color='{col}'>● {nxt['impact']}</font>"
                 f"<br><b>{nxt['title']}</b><br>"
-                f"<font color='{THEMES[self._theme]['muted']}'>{cdl} • {when}</font>"
+                f"<font color='{t['muted']}'>{cdl} • {when}</font>"
             )
         else:
             self.next_card.setText("No upcoming events for this filter.")
 
-        # news list: rebuild only when content changes (avoids flicker/garbage
-        # from deleteLater churn on every 1s tick while the panel is open)
         shown = calendar_api.filter_events(
             news, self.c.settings["currencies"], self.c.settings["min_impact"], 72, now_utc
         )[:8]
@@ -557,28 +840,27 @@ class SessionPanel(QWidget):
                     w.deleteLater()
             self._news_labels: list[QLabel] = []
             if not shown:
-                lab = QLabel("No events — press ↻ or widen the currency filter.")
+                lab = QLabel("No events — press ↻ or widen the impact / currency filter.")
                 lab.setWordWrap(True)
                 self.news_list.addWidget(lab)
                 self._news_labels.append(lab)
             for e in shown:
                 col = IMPACT_COLOR.get(e["impact"], "#8e8e93")
-                t = _fmt_event_time(e["date_utc"])
+                tt = _fmt_event_time(e["date_utc"])
                 lab = QLabel(
                     f"<font color='{col}'>●</font> <b>{e['currency']}</b> {e['title']} "
-                    f"<font color='{THEMES[self._theme]['muted']}'>· {t}</font>"
+                    f"<font color='{t['muted']}'>· {tt}</font>"
                 )
                 lab.setWordWrap(True)
                 self.news_list.addWidget(lab)
                 self._news_labels.append(lab)
         else:
-            # same events: just refresh relative times in place
             for lab, e in zip(getattr(self, "_news_labels", []), shown):
                 col = IMPACT_COLOR.get(e["impact"], "#8e8e93")
-                t = _fmt_event_time(e["date_utc"])
+                tt = _fmt_event_time(e["date_utc"])
                 lab.setText(
                     f"<font color='{col}'>●</font> <b>{e['currency']}</b> {e['title']} "
-                    f"<font color='{THEMES[self._theme]['muted']}'>· {t}</font>"
+                    f"<font color='{t['muted']}'>· {tt}</font>"
                 )
 
         self.foot.setText(f"{_next_nyse_holiday_line(now_utc)}  •  ForexFactory feed")
@@ -657,20 +939,24 @@ class TrayController:
         grp = QActionGroup(self.menu)
         grp.setExclusive(True)
         for m in MARKETS:
-            a = QAction(f"{m['flag']}  {m['name']}", self.menu, checkable=True)
+            a = QAction(f"  {m['name']}", self.menu, checkable=True)
+            a.setIcon(landmark_menu_icon(m))
             a.setChecked(m["id"] == self.settings["selected_market"])
             a.triggered.connect(lambda _=False, mid=m["id"]: self.select_market(mid))
             grp.addAction(a)
             self.menu.addAction(a)
         self.menu.addSeparator()
 
-        # News filter: minimum impact
+        # News filter: minimum impact (All includes holidays)
         filt = self.menu.addMenu("News: min impact")
         igrp = QActionGroup(self.menu)
         igrp.setExclusive(True)
-        for lvl, dot in (("Low", "⚪ Low+"), ("Medium", "🟡 Med+"), ("High", "🔴 High only")):
+        for lvl, dot in (("All", "🌐 All (incl. holidays)"),
+                         ("Low", "🟡 Low+"),
+                         ("Medium", "🟠 Med+"),
+                         ("High", "🔴 High only")):
             a = QAction(dot, self.menu, checkable=True)
-            a.setChecked(self.settings.get("min_impact", "Low") == lvl)
+            a.setChecked(self.settings.get("min_impact", "All") == lvl)
             a.triggered.connect(lambda _=False, lv=lvl: self.set_min_impact(lv))
             igrp.addAction(a)
             filt.addAction(a)
@@ -962,9 +1248,10 @@ class TrayController:
     def _relaunch(self):
         try:
             if IS_PACKAGED and os.path.exists(LAUNCHER_PATH):
-                cmd = f"sleep 2; exec {LAUNCHER_PATH}"
+                cmd = f"sleep 2; SESSION_SYNC_RELAUNCH=1 exec {LAUNCHER_PATH}"
             else:
-                cmd = f"sleep 2; exec /usr/bin/python3 {os.path.join(app_dir(), 'main.py')}"
+                cmd = (f"sleep 2; SESSION_SYNC_RELAUNCH=1 exec /usr/bin/python3 "
+                       f"{os.path.join(app_dir(), 'main.py')}")
             subprocess.Popen(
                 ["setsid", "bash", "-c", cmd],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -1001,10 +1288,11 @@ class TrayController:
             except Exception:
                 pass
         m = self.selected["market"]
-        cd = engine.format_countdown(self.selected["countdown"])
+        cd = engine.format_signed_countdown(
+            self.selected["countdown"], is_open, include_seconds=True)
         yours = now_utc.astimezone().strftime("%H:%M %Z")
-        tip = (f"{m['flag']} {m['name']} {'● OPEN' if is_open else '○ CLOSED'}\n"
-               f"{'Closes' if is_open else 'Opens'} in {cd}\n"
+        tip = (f"{m['name']} {'● OPEN' if is_open else '○ CLOSED'}\n"
+               f"{cd} until {'close' if is_open else 'open'}\n"
                f"Market {self.selected['now_local'].strftime('%H:%M %Z')} • Yours {yours}")
         if nxt and nxt.get("_dt"):
             try:

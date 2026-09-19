@@ -12,6 +12,10 @@ Description: Market countdown + economic news in your system tray
  New York FX and NYSE, a DST-aware market clock next to your local time,
  and the next economic events from the ForexFactory calendar.
  .
+ Material-glass design: frosted translucent cards with landmark vector
+ badges (London Eye, Statue of Liberty, Sydney Opera House, Torii Gate),
+ signed countdowns, neon-green active sessions, and impact filter chips.
+ .
  It lives in the system tray (Cinnamon/MATE/Xfce/GNOME), can start silently
  at login, supports one-click self-updates from GitHub releases, and ships
  six themes (system, light, dark, dark purple, mint light, mint dark).

@@ -46,19 +46,34 @@ python3 main.py --cli --news          # text mode, no Qt needed
 ```
 </details>
 
+## Screenshots
+
+| Dark glass | Light glass | Mint dark | Dark purple |
+|---|---|---|---|
+| ![dark](docs/screenshots/panel-dark.png) | ![light](docs/screenshots/panel-light.png) | ![mint](docs/screenshots/panel-mint_dark.png) | ![purple](docs/screenshots/panel-dark_purple.png) |
+
+Material-glass design: frosted translucent cards, landmark vector badges
+(London Eye, Statue of Liberty, Sydney Opera House, Torii Gate), signed
+countdowns (`+ 05:18` open / `- 23:42` closed), active sessions glowing
+neon green while closed ones dim to slate, and impact chips
+[All] [🟡 Low] [🟠 Med] [🔴 High].
+
 ## Features
 
 | Feature | Notes |
 |---|---|
 | 5 markets, DST-correct | Sydney, Tokyo, London, New York FX, NYSE — IANA timezones, not hardcoded UTC |
-| Live countdown | 1-second tray countdown to the next open/close |
+| Glass design (v0.2) | Frosted translucent panel + cards, landmark badges, no heavy blur effects — smooth on Cinnamon |
+| Market cards | Clickable glass cards with signed countdowns, OPEN/CLOSED pills, mini progress rings |
+| Active-session brightening | Open sessions glow neon green; closed ones dim to muted slate |
+| Live countdown | 1-second tray countdown (`LON +02:14:33`) to the next open/close |
 | Market vs local clock | Both always shown, labelled; one tap to flip emphasis |
 | Economic calendar | ForexFactory feed, no API key, cached offline |
-| News impact filters | Low / Medium / High minimum + currency filter (8 majors) |
+| Impact chips | [All] [🟡 Low] [🟠 Med] [🔴 High] minimum filter + currency filter (8 majors); All includes holidays |
 | “Next event” in tray | `• USD 45m` style badge, plus tooltip |
 | Alerts | Open/close pre-alert + high-impact news notifications |
 | Holiday aware | NYSE holidays + early closes computed locally, no pandas |
-| 6 themes | System, Light, Dark, Dark Purple, Mint Light, Mint Dark |
+| 6 themes | System, Light, Dark, Dark Purple, Mint Light, Mint Dark — all in glass |
 | One-click updates | Notifies on new GitHub release, installs with a password prompt |
 | Crash-resilient | Auto-hide panel, single instance, restart-on-crash launcher, cached tray icon |
 

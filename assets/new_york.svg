@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- New York / Statue of Liberty Torch Landmark -->
+  <!-- Torch Flame -->
+  <path d="M 32,8 C 36,12 39,17 35,22 C 33,18 29,19 28,15 C 27,11 30,9 32,8 Z" fill="#ff9f0a"/>
+  <!-- Flame Core Glow -->
+  <path d="M 32,12 C 34,14 35,17 33,20 C 31,18 30,17 32,12 Z" fill="#ffd60a"/>
+  <!-- Torch Cup / Rim -->
+  <ellipse cx="32" cy="23" rx="9" ry="3.5" fill="#c792ea"/>
+  <!-- Torch Balcony / Handle Top -->
+  <polygon points="25,23 39,23 36,33 28,33" fill="#a855f7"/>
+  <rect x="27" y="33" width="10" height="3" rx="1.5" fill="#c792ea"/>
+  <!-- Torch Handle Shaft -->
+  <polygon points="28,36 36,36 34,50 30,50" fill="#a855f7"/>
+  <!-- Bottom Knob / Base -->
+  <circle cx="32" cy="53" r="3.5" fill="#c792ea"/>
+  <!-- Liberty Crown Rays on sides (subtle radiating accent) -->
+  <line x1="16" y1="20" x2="22" y2="22" stroke="#c792ea" stroke-width="2" stroke-linecap="round"/>
+  <line x1="48" y1="20" x2="42" y2="22" stroke="#c792ea" stroke-width="2" stroke-linecap="round"/>
+  <line x1="18" y1="27" x2="23" y2="27" stroke="#c792ea" stroke-width="2" stroke-linecap="round"/>
+  <line x1="46" y1="27" x2="41" y2="27" stroke="#c792ea" stroke-width="2" stroke-linecap="round"/>
+</svg>
