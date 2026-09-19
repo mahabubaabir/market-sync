@@ -9,3 +9,8 @@ build/
 # opencode session exports (large, local only)
 new-session---*.json
 installation-help-request.json
+# videos stay local only (never pushed)
+*.mp4
+*.mkv
+*.webm
+*.mov
