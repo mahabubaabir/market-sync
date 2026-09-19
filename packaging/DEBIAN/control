@@ -3,7 +3,7 @@ Version: __VERSION__
 Section: utils
 Priority: optional
 Architecture: all
-Depends: python3 (>= 3.10), python3-pyqt6, python3-requests, libnotify-bin, libxcb-cursor0
+Depends: python3 (>= 3.10), python3-pyqt6, python3-pyqt6.qtsvg, python3-requests, libnotify-bin, libxcb-cursor0
 Recommends: pkexec | policykit-1
 Maintainer: mahabubaabir <mahabubaabir@users.noreply.github.com>
 Homepage: https://github.com/mahabubaabir/market-sync

@@ -31,6 +31,12 @@ done
 for a in assets/*.svg; do
   install -m 0644 "$a" "$BUILD/opt/$APP/assets/$(basename "$a")"
 done
+# Cinnamon panel applet + its installer
+mkdir -p "$BUILD/opt/$APP/cinnamon-applet/$APP@cinnamon"
+for f in cinnamon-applet/$APP@cinnamon/*; do
+  install -m 0644 "$f" "$BUILD/opt/$APP/cinnamon-applet/$APP@cinnamon/$(basename "$f")"
+done
+install -m 0755 install-applet.sh "$BUILD/opt/$APP/install-applet.sh"
 
 # --- icons: scalable SVG + rendered PNGs
 install -m 0644 assets/icon.svg "$BUILD/usr/share/icons/hicolor/scalable/apps/$APP.svg"

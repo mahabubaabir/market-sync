@@ -14,10 +14,12 @@ try:
 except ImportError:
     HAS_REQUESTS = False
 
+from config import CACHE_DIR as _CACHE_DIR, NEWS_CACHE_PATH, LEGACY_NEWS_CACHE_PATH
+
 APP_ID = "market-sync"
 FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
-CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", APP_ID)
-CACHE_PATH = os.path.join(CACHE_DIR, "calendar.json")
+CACHE_DIR = _CACHE_DIR
+CACHE_PATH = NEWS_CACHE_PATH
 
 IMPACT_RANK = {"All": 0, "High": 3, "Medium": 2, "Low": 1, "Holiday": 0, "": 0}
 
@@ -59,14 +61,24 @@ def _normalize(item: dict) -> dict | None:
     }
 
 
+def _cache_file() -> str:
+    """Prefer news_events.json; fall back to the legacy calendar.json."""
+    if os.path.exists(CACHE_PATH):
+        return CACHE_PATH
+    if os.path.exists(LEGACY_NEWS_CACHE_PATH):
+        return LEGACY_NEWS_CACHE_PATH
+    return CACHE_PATH
+
+
 def _read_cache(max_age_min: int = 60 * 24) -> list[dict]:
     try:
-        if not os.path.exists(CACHE_PATH):
+        path = _cache_file()
+        if not os.path.exists(path):
             return []
-        age = (datetime.now().timestamp() - os.path.getmtime(CACHE_PATH)) / 60
+        age = (datetime.now().timestamp() - os.path.getmtime(path)) / 60
         if age > max_age_min:
             return []
-        with open(CACHE_PATH, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         return data if isinstance(data, list) else []
     except Exception:

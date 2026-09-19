@@ -1,11 +1,14 @@
-"""Market Sync — glass market countdown + news for the Cinnamon tray.
+"""Market Sync — Material UI frosted-glass countdown + news for Linux desktops.
 
-Design parity with Market Sync v0.2:
-  panel  -> 2-column landmark market cards -> brand bar (logo, alerts bell,
-            preferences gear) -> collapsible "Up Next" drawer with
-            [All] [High] [Med] [Low] multi-select chips, news rows with
-            impact + currency pills, and a date bar.
-  tray   -> multi-market text (open + next, bright/dim) or logo+dot icon.
+Implements the Market Sync Design System v2.0 (System_Design/DESIGN_SYSTEM.md):
+  - Window: 410px, radius 14, Tool + Frameless + StaysOnTop, translucent glass
+  - 2-column landmark market cards (82px): badge, name + local time, big signed
+    countdown, OPEN/CLOSED pill, mini progress ring
+  - Brand bar (32px): logo, MARKET SYNC, drawer toggle, alerts bell, settings
+  - Up Next drawer: multi-select impact chips, news rows with impact + currency
+    capsules, date bar
+  - Cinnamon applet bridge: writes ~/.cache/market-sync/panel_status.json and
+    serves IPC (toggle/show/hide/preferences/quit) on QLocalServer.
 """
 from __future__ import annotations
 from datetime import datetime, timezone
@@ -18,12 +21,14 @@ try:
         QApplication, QWidget, QSystemTrayIcon, QMenu,
         QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea,
         QFrame, QCheckBox, QGridLayout, QDialog, QComboBox, QButtonGroup,
+        QSizePolicy,
     )
     from PyQt6.QtGui import (
         QIcon, QPixmap, QPainter, QColor, QFont, QAction, QActionGroup,
         QFontMetrics, QPen, QCursor,
     )
     from PyQt6.QtCore import QTimer, Qt, QRectF, QEvent, pyqtSignal
+    from PyQt6.QtNetwork import QLocalServer, QLocalSocket
     HAS_QT = True
 except ImportError:
     HAS_QT = False
@@ -39,119 +44,171 @@ except ImportError:
 from config import (
     MARKETS, MARKET_IDS, get_market, ALL_CURRENCIES, is_autostart_enabled,
     USER_AUTOSTART_PATH, autostart_exec_line, app_dir, IS_PACKAGED,
-    LAUNCHER_PATH, APP_NAME, APP_VERSION, CACHE_DIR, UPDATE_CHECK_HOURS,
+    LAUNCHER_PATH, APP_NAME, APP_VERSION, APP_AUTHOR, CACHE_DIR,
+    UPDATE_CHECK_HOURS, IPC_SOCKET_NAME, APPLET_UUID, PANEL_STATUS_PATH,
 )
 import markets as engine
 import calendar_api
 import updater
 from notifier import notify, AlertTracker
 
-ACCENT = "#0071e3"   # fallback accent (themes define their own)
-GREEN = "#30d158"    # active session neon green
-RED = "#ff453a"      # closed session countdown red
+GREEN = "#30d158"   # neon active green (dark glass)
+RED = "#ef4444"     # high impact / closed accents
+CYAN = "#38bdf8"    # brand cyan
 
 ASSETS_DIR = os.path.join(app_dir(), "assets")
 
-# ------------------------------------------------------------ glass themes
-# v0.2 Material-glass tokens: translucent panel + cards, brighter card and
-# green border while a session is open, dimmed while closed.
+# ----------------------------------------------------------------- v2.0 tokens
+# Material UI frosted glass: translucent surfaces, neon active highlights,
+# crisp silvery muted off-states. Purple/Mint follow the same token shape.
 THEMES = {
-    "light": {
-        "bg": "rgba(250, 252, 255, 0.90)",
-        "solid_bg": "#f7f9fc",
-        "glass_border": "rgba(255, 255, 255, 0.65)",
-        "card": "rgba(255, 255, 255, 0.92)",
-        "tint": "rgba(232, 241, 252, 0.90)",
-        "border": "rgba(0, 0, 0, 0.08)",
-        "text": "#1d1d1f", "muted": "#6e6e73",
-        "accent": "#0071e3",
-        "card_open": "rgba(255, 255, 255, 0.95)",
-        "card_closed": "rgba(243, 246, 250, 0.80)",
-        "card_border_open": "rgba(34, 197, 94, 0.60)",
-        "card_border_closed": "rgba(0, 0, 0, 0.08)",
-        "pill_open_bg": "rgba(34, 197, 94, 0.16)", "pill_open_text": "#16a34a",
-        "pill_closed_bg": "rgba(100, 116, 139, 0.12)", "pill_closed_text": "#64748b",
-        "ring_track": "rgba(0, 0, 0, 0.08)",
-        "badge_bg": "rgba(241, 245, 249, 0.85)",
-        "tray_text": "#1d1d1f",
-    },
     "dark": {
         "bg": "rgba(16, 20, 30, 0.88)",
-        "solid_bg": "#12161f",
-        "glass_border": "rgba(255, 255, 255, 0.12)",
-        "card": "rgba(26, 34, 52, 0.85)",
-        "tint": "rgba(37, 50, 74, 0.85)",
-        "border": "rgba(255, 255, 255, 0.10)",
-        "text": "#e8eaed", "muted": "#9aa0a6",
-        "accent": "#0a84ff",
-        "card_open": "rgba(26, 34, 52, 0.90)",
-        "card_closed": "rgba(20, 24, 36, 0.65)",
-        "card_border_open": "rgba(48, 209, 88, 0.55)",
-        "card_border_closed": "rgba(255, 255, 255, 0.08)",
-        "pill_open_bg": "rgba(34, 197, 94, 0.22)", "pill_open_text": "#30d158",
-        "pill_closed_bg": "rgba(148, 163, 184, 0.12)", "pill_closed_text": "#94a3b8",
-        "ring_track": "rgba(255, 255, 255, 0.10)",
+        "border": "rgba(255, 255, 255, 0.08)",
+        "card": "rgba(28, 34, 48, 0.70)",
+        "card_active": "rgba(20, 42, 30, 0.65)",
+        "card_border": "rgba(255, 255, 255, 0.06)",
+        "card_border_active": "#30d158",
+        "card_border_hover": "rgba(255, 255, 255, 0.16)",
+        "text": "#f1f5f9",
+        "secondary": "#94a3b8",
+        "muted": "#64748b",
+        "green": "#30d158",
+        "cyan": "#38bdf8",
+        "closed": "#cbd5e1",
+        "divider": "rgba(255, 255, 255, 0.08)",
+        "ring_track": "rgba(255, 255, 255, 0.12)",
+        "row_bg": "rgba(255, 255, 255, 0.03)",
+        "row_border": "rgba(255, 255, 255, 0.04)",
+        "input_bg": "rgba(255, 255, 255, 0.06)",
+        "input_hover": "rgba(255, 255, 255, 0.10)",
+        "input_selected": "rgba(56, 189, 248, 0.22)",
+        "input_border": "rgba(255, 255, 255, 0.12)",
+        "input_border_selected": "#38bdf8",
         "badge_bg": "rgba(34, 40, 58, 0.85)",
+        "solid_bg": "#12161f",
         "tray_text": "#ffffff",
+        "pill_open_bg": "rgba(48, 209, 88, 0.18)", "pill_open_text": "#30d158",
+        "pill_closed_bg": "rgba(203, 213, 225, 0.10)", "pill_closed_text": "#cbd5e1",
+    },
+    "light": {
+        "bg": "rgba(250, 252, 255, 0.88)",
+        "border": "rgba(0, 0, 0, 0.08)",
+        "card": "rgba(255, 255, 255, 0.85)",
+        "card_active": "rgba(236, 253, 245, 0.90)",
+        "card_border": "rgba(0, 0, 0, 0.06)",
+        "card_border_active": "#16a34a",
+        "card_border_hover": "rgba(0, 0, 0, 0.14)",
+        "text": "#0f172a",
+        "secondary": "#475569",
+        "muted": "#94a3b8",
+        "green": "#16a34a",
+        "cyan": "#0284c7",
+        "closed": "#334155",
+        "divider": "rgba(0, 0, 0, 0.08)",
+        "ring_track": "rgba(0, 0, 0, 0.10)",
+        "row_bg": "rgba(0, 0, 0, 0.03)",
+        "row_border": "rgba(0, 0, 0, 0.05)",
+        "input_bg": "rgba(0, 0, 0, 0.04)",
+        "input_hover": "rgba(0, 0, 0, 0.07)",
+        "input_selected": "rgba(2, 132, 199, 0.16)",
+        "input_border": "rgba(0, 0, 0, 0.12)",
+        "input_border_selected": "#0284c7",
+        "badge_bg": "rgba(241, 245, 249, 0.90)",
+        "solid_bg": "#f7f9fc",
+        "tray_text": "#0f172a",
+        "pill_open_bg": "rgba(22, 163, 74, 0.14)", "pill_open_text": "#16a34a",
+        "pill_closed_bg": "rgba(51, 65, 85, 0.10)", "pill_closed_text": "#334155",
     },
     "dark_purple": {
-        "bg": "rgba(23, 18, 34, 0.88)",
-        "solid_bg": "#1a1428",
-        "glass_border": "rgba(255, 255, 255, 0.12)",
-        "card": "rgba(36, 29, 51, 0.85)",
-        "tint": "rgba(45, 36, 71, 0.85)",
-        "border": "rgba(255, 255, 255, 0.10)",
-        "text": "#ece7f6", "muted": "#9d94b8",
-        "accent": "#a78bfa",
-        "card_open": "rgba(38, 30, 56, 0.92)",
-        "card_closed": "rgba(26, 20, 39, 0.65)",
-        "card_border_open": "rgba(48, 209, 88, 0.55)",
-        "card_border_closed": "rgba(255, 255, 255, 0.08)",
-        "pill_open_bg": "rgba(34, 197, 94, 0.22)", "pill_open_text": "#30d158",
-        "pill_closed_bg": "rgba(148, 163, 184, 0.12)", "pill_closed_text": "#9d94b8",
-        "ring_track": "rgba(255, 255, 255, 0.10)",
+        "bg": "rgba(24, 19, 36, 0.88)",
+        "border": "rgba(255, 255, 255, 0.08)",
+        "card": "rgba(38, 31, 54, 0.70)",
+        "card_active": "rgba(28, 44, 34, 0.65)",
+        "card_border": "rgba(255, 255, 255, 0.06)",
+        "card_border_active": "#35c48d",
+        "card_border_hover": "rgba(255, 255, 255, 0.16)",
+        "text": "#ece7f6",
+        "secondary": "#a99fc4",
+        "muted": "#7d7396",
+        "green": "#35c48d",
+        "cyan": "#a78bfa",
+        "closed": "#cfc7e2",
+        "divider": "rgba(255, 255, 255, 0.08)",
+        "ring_track": "rgba(255, 255, 255, 0.12)",
+        "row_bg": "rgba(255, 255, 255, 0.03)",
+        "row_border": "rgba(255, 255, 255, 0.04)",
+        "input_bg": "rgba(255, 255, 255, 0.06)",
+        "input_hover": "rgba(255, 255, 255, 0.10)",
+        "input_selected": "rgba(167, 139, 250, 0.22)",
+        "input_border": "rgba(255, 255, 255, 0.12)",
+        "input_border_selected": "#a78bfa",
         "badge_bg": "rgba(46, 36, 66, 0.85)",
+        "solid_bg": "#1a1428",
         "tray_text": "#ece7f6",
+        "pill_open_bg": "rgba(53, 196, 141, 0.18)", "pill_open_text": "#35c48d",
+        "pill_closed_bg": "rgba(207, 199, 226, 0.10)", "pill_closed_text": "#cfc7e2",
     },
     "mint_light": {
-        "bg": "rgba(242, 250, 245, 0.90)",
-        "solid_bg": "#f2faf5",
-        "glass_border": "rgba(255, 255, 255, 0.65)",
-        "card": "rgba(255, 255, 255, 0.92)",
-        "tint": "rgba(226, 245, 234, 0.90)",
+        "bg": "rgba(244, 251, 247, 0.88)",
         "border": "rgba(16, 43, 35, 0.08)",
-        "text": "#1c2b23", "muted": "#5f7a6c",
-        "accent": "#10b981",
-        "card_open": "rgba(255, 255, 255, 0.95)",
-        "card_closed": "rgba(238, 248, 242, 0.80)",
-        "card_border_open": "rgba(16, 185, 129, 0.60)",
-        "card_border_closed": "rgba(16, 43, 35, 0.08)",
-        "pill_open_bg": "rgba(16, 185, 129, 0.16)", "pill_open_text": "#059669",
-        "pill_closed_bg": "rgba(100, 116, 139, 0.12)", "pill_closed_text": "#5f7a6c",
-        "ring_track": "rgba(16, 43, 35, 0.08)",
-        "badge_bg": "rgba(226, 245, 234, 0.85)",
-        "tray_text": "#1c2b23",
+        "card": "rgba(255, 255, 255, 0.85)",
+        "card_active": "rgba(226, 250, 238, 0.90)",
+        "card_border": "rgba(16, 43, 35, 0.06)",
+        "card_border_active": "#10b981",
+        "card_border_hover": "rgba(16, 43, 35, 0.14)",
+        "text": "#0f2a1f",
+        "secondary": "#3f6b58",
+        "muted": "#7fa392",
+        "green": "#10b981",
+        "cyan": "#0d9488",
+        "closed": "#33594a",
+        "divider": "rgba(16, 43, 35, 0.08)",
+        "ring_track": "rgba(16, 43, 35, 0.10)",
+        "row_bg": "rgba(16, 43, 35, 0.03)",
+        "row_border": "rgba(16, 43, 35, 0.05)",
+        "input_bg": "rgba(16, 43, 35, 0.05)",
+        "input_hover": "rgba(16, 43, 35, 0.08)",
+        "input_selected": "rgba(16, 185, 129, 0.18)",
+        "input_border": "rgba(16, 43, 35, 0.12)",
+        "input_border_selected": "#10b981",
+        "badge_bg": "rgba(226, 245, 234, 0.90)",
+        "solid_bg": "#f2faf5",
+        "tray_text": "#0f2a1f",
+        "pill_open_bg": "rgba(16, 185, 129, 0.14)", "pill_open_text": "#059669",
+        "pill_closed_bg": "rgba(51, 89, 74, 0.10)", "pill_closed_text": "#33594a",
     },
     "mint_dark": {
         "bg": "rgba(18, 29, 24, 0.88)",
-        "solid_bg": "#121d18",
-        "glass_border": "rgba(255, 255, 255, 0.12)",
-        "card": "rgba(31, 45, 38, 0.85)",
-        "tint": "rgba(36, 59, 48, 0.85)",
-        "border": "rgba(255, 255, 255, 0.10)",
-        "text": "#e3f0e9", "muted": "#8fae9e",
-        "accent": "#35c48d",
-        "card_open": "rgba(33, 50, 41, 0.92)",
-        "card_closed": "rgba(22, 33, 27, 0.65)",
-        "card_border_open": "rgba(53, 196, 141, 0.55)",
-        "card_border_closed": "rgba(255, 255, 255, 0.08)",
-        "pill_open_bg": "rgba(53, 196, 141, 0.22)", "pill_open_text": "#35c48d",
-        "pill_closed_bg": "rgba(148, 163, 184, 0.12)", "pill_closed_text": "#8fae9e",
-        "ring_track": "rgba(255, 255, 255, 0.10)",
+        "border": "rgba(255, 255, 255, 0.08)",
+        "card": "rgba(31, 45, 38, 0.70)",
+        "card_active": "rgba(22, 48, 36, 0.65)",
+        "card_border": "rgba(255, 255, 255, 0.06)",
+        "card_border_active": "#35c48d",
+        "card_border_hover": "rgba(255, 255, 255, 0.16)",
+        "text": "#e3f0e9",
+        "secondary": "#9fc0af",
+        "muted": "#6f8f7f",
+        "green": "#35c48d",
+        "cyan": "#2dd4bf",
+        "closed": "#c6dccf",
+        "divider": "rgba(255, 255, 255, 0.08)",
+        "ring_track": "rgba(255, 255, 255, 0.12)",
+        "row_bg": "rgba(255, 255, 255, 0.03)",
+        "row_border": "rgba(255, 255, 255, 0.04)",
+        "input_bg": "rgba(255, 255, 255, 0.06)",
+        "input_hover": "rgba(255, 255, 255, 0.10)",
+        "input_selected": "rgba(53, 196, 141, 0.22)",
+        "input_border": "rgba(255, 255, 255, 0.12)",
+        "input_border_selected": "#35c48d",
         "badge_bg": "rgba(36, 54, 44, 0.85)",
+        "solid_bg": "#121d18",
         "tray_text": "#e3f0e9",
+        "pill_open_bg": "rgba(53, 196, 141, 0.18)", "pill_open_text": "#35c48d",
+        "pill_closed_bg": "rgba(198, 220, 207, 0.10)", "pill_closed_text": "#c6dccf",
     },
 }
+THEMES["system"] = THEMES["dark"]  # placeholder; resolve_theme() maps it
 
 THEME_ORDER = ["system", "light", "dark", "dark_purple", "mint_light", "mint_dark"]
 THEME_LABELS = {
@@ -163,85 +220,214 @@ THEME_ICON = {
     "dark_purple": "🟣", "mint_light": "🌿", "mint_dark": "🍃",
 }
 
-# v0.2 news-row pill palette: High red, Medium orange, Low yellow.
-PILL_STYLE = {
-    "High": ("#ef4444", "rgba(239, 68, 68, 0.20)"),
-    "Medium": ("#f97316", "rgba(249, 115, 22, 0.20)"),
-    "Low": ("#eab308", "rgba(234, 179, 8, 0.20)"),
-    "Holiday": ("#bf5af2", "rgba(191, 90, 242, 0.20)"),
+# v2.0 news-impact capsules (dark + light variants)
+IMPACT_STYLE = {
+    "High": {
+        "dark": ("#ef4444", "rgba(239, 68, 68, 0.18)", "rgba(239, 68, 68, 0.40)"),
+        "light": ("#b91c1c", "#fee2e2", "#fca5a5"),
+    },
+    "Medium": {
+        "dark": ("#f97316", "rgba(249, 115, 22, 0.18)", "rgba(249, 115, 22, 0.40)"),
+        "light": ("#c2410c", "#ffedd5", "#fdba74"),
+    },
+    "Low": {
+        "dark": ("#eab308", "rgba(234, 179, 8, 0.18)", "rgba(234, 179, 8, 0.40)"),
+        "light": ("#854d0e", "#fef9c3", "#fde047"),
+    },
+    "Holiday": {
+        "dark": ("#a1a1aa", "rgba(161, 161, 170, 0.15)", "rgba(161, 161, 170, 0.30)"),
+        "light": ("#52525b", "#f4f4f5", "#d4d4d8"),
+    },
 }
+IMPACT_SHORT = {"High": "HIGH", "Medium": "MED", "Low": "LOW", "Holiday": "HOL"}
 PILL_DOT = {"High": "🔴", "Medium": "🟠", "Low": "🟡", "Holiday": "🟣"}
-CHIP_BASE = {"High": "#ef4444", "Medium": "#f97316", "Low": "#eab308"}
 
-# v0.2 per-currency pill colors.
+# v2.0 currency accent palette
 CURRENCY_COLORS = {
-    "USD": ("#f97316", "rgba(249, 115, 22, 0.16)"),
-    "EUR": ("#16a34a", "rgba(22, 163, 74, 0.16)"),
-    "GBP": ("#0d9488", "rgba(13, 148, 136, 0.16)"),
-    "JPY": ("#e11d48", "rgba(225, 29, 72, 0.16)"),
-    "AUD": ("#2563eb", "rgba(37, 99, 235, 0.16)"),
-    "CAD": ("#9333ea", "rgba(147, 51, 234, 0.16)"),
-    "CHF": ("#dc2626", "rgba(220, 38, 38, 0.16)"),
-    "NZD": ("#0284c7", "rgba(2, 132, 199, 0.16)"),
+    "USD": "#38bdf8", "EUR": "#10b981", "GBP": "#c084fc", "JPY": "#f87171",
+    "AUD": "#fb923c", "CAD": "#e879f9", "CHF": "#e2e8f0", "NZD": "#34d399",
 }
 
-# Sentinel: distinguishes "update check not finished yet" from "no update".
 _UNSET = object()
 
 
 def resolve_theme(want: str) -> str:
-    if want in THEMES:
+    if want in THEMES and want != "system":
         return want
-    # system: ask Qt when available, else dark (v0.2 default)
     if HAS_QT:
         try:
-            from PyQt6.QtWidgets import QApplication
-            from PyQt6.QtCore import Qt as _Qt
             app = QApplication.instance()
             if app is not None:
                 scheme = app.styleHints().colorScheme()
-                if scheme == _Qt.ColorScheme.Dark:
+                if scheme == Qt.ColorScheme.Dark:
                     return "dark"
-                if scheme == _Qt.ColorScheme.Light:
+                if scheme == Qt.ColorScheme.Light:
                     return "light"
         except Exception:
             pass
     return "dark"
 
 
+def qcolor(s: str) -> "QColor":
+    """Parse '#rrggbb' or 'rgba(r, g, b, a)' (float or int alpha) to QColor.
+
+    Note: QColor() rejects float-alpha rgba() strings that QSS accepts,
+    silently producing black — this normalises them.
+    """
+    try:
+        if s.startswith("rgba"):
+            inside = s[s.index("(") + 1:s.index(")")]
+            parts = [p.strip() for p in inside.split(",")]
+            r, g, b = int(float(parts[0])), int(float(parts[1])), int(float(parts[2]))
+            a = float(parts[3])
+            if a <= 1.0:
+                a = int(round(a * 255))
+            return QColor(r, g, b, int(a))
+        return QColor(s)
+    except Exception:
+        return QColor("#808080")
+
+
+def app_font(px: int, weight: QFont.Weight = QFont.Weight.Normal) -> "QFont":
+    """Design-system font stack: Inter -> Noto Sans -> Ubuntu -> Sans."""
+    f = QFont("Inter")
+    try:
+        f.setFamilies(["Inter", "Noto Sans", "Ubuntu", "DejaVu Sans", "Sans"])
+    except Exception:
+        pass
+    f.setPixelSize(px)
+    f.setWeight(weight)
+    return f
+
+
+def mono_font(px: int, weight: QFont.Weight = QFont.Weight.Bold) -> "QFont":
+    f = QFont("JetBrains Mono")
+    try:
+        f.setFamilies(["JetBrains Mono", "Fira Code", "DejaVu Sans Mono", "monospace"])
+    except Exception:
+        pass
+    f.setPixelSize(px)
+    f.setWeight(weight)
+    return f
+
+
 def stylesheet(t: dict) -> str:
     return f"""
-QWidget#PanelRoot {{
+QFrame#PanelRoot {{
     background: {t['bg']};
-    border: 1px solid {t['glass_border']};
-    border-radius: 18px;
+    border: 1px solid {t['border']};
+    border-radius: 14px;
 }}
 QLabel {{ color: {t['text']}; background: transparent; }}
-QLabel.muted {{ color: {t['muted']}; font-size: 11px; }}
-QLabel.caption {{ color: {t['muted']}; font-size: 10px; font-weight: 700; letter-spacing: 1.0px; }}
-QFrame.card {{ background: {t['card']}; border: 1px solid {t['border']}; border-radius: 12px; }}
-QPushButton.ghost {{ background: transparent; color: {t['muted']}; border: 1px solid {t['border']}; border-radius: 7px; padding: 4px 10px; font-size: 12px; }}
-QPushButton.ghost:hover {{ color: {t['text']}; border-color: {t['accent']}; }}
-QPushButton.bar {{ background: transparent; color: {t['muted']}; border: none; border-radius: 6px; padding: 2px 6px; font-size: 13px; }}
-QPushButton.bar:hover {{ color: {t['text']}; background: {t['tint']}; }}
-QPushButton.quitbtn {{ background: #ff453a; color: white; border: none; border-radius: 7px; padding: 5px 12px; font-size: 12px; font-weight: 800; }}
-QPushButton.quitbtn:hover {{ background: #d70015; }}
-QPushButton.primary {{ background: {t['accent']}; color: white; border: none; border-radius: 7px; padding: 6px 18px; font-weight: 800; font-size: 12px; }}
-QCheckBox {{ color: {t['text']}; font-size: 12px; background: transparent; }}
+QLabel.caption {{ color: {t['secondary']}; font-size: 10px; font-weight: 700; letter-spacing: 1.0px; }}
+QFrame#MarketCard {{ border-radius: 10px; }}
+QPushButton.bar {{ background: transparent; color: {t['secondary']}; border: none; border-radius: 6px; padding: 2px 6px; font-size: 13px; }}
+QPushButton.bar:hover {{ color: {t['text']}; background: {t['input_hover']}; }}
+QPushButton.ghost {{ background: transparent; color: {t['secondary']}; border: 1px solid {t['input_border']}; border-radius: 7px; padding: 4px 10px; font-size: 12px; }}
+QPushButton.ghost:hover {{ color: {t['text']}; border-color: {t['input_border_selected']}; }}
+QPushButton.quitbtn {{ background: #ef4444; color: white; border: none; border-radius: 7px; padding: 5px 12px; font-size: 12px; font-weight: 800; }}
+QPushButton.quitbtn:hover {{ background: #dc2626; }}
+QPushButton.primary {{ background: {t['cyan']}; color: white; border: none; border-radius: 7px; padding: 6px 18px; font-weight: 800; font-size: 12px; }}
+QPushButton[seg="1"] {{ background: {t['input_bg']}; color: {t['secondary']}; border: 1px solid {t['input_border']}; border-radius: 7px; padding: 3px 10px; font-size: 11px; font-weight: 600; }}
+QPushButton[seg="1"]:hover {{ background: {t['input_hover']}; }}
+QPushButton[seg="1"]:checked {{ background: {t['input_selected']}; border-color: {t['input_border_selected']}; color: {t['text']}; }}
+QCheckBox {{ color: {t['text']}; font-size: 12px; background: transparent; spacing: 6px; }}
 QScrollArea {{ border: none; background: transparent; }}
 QScrollArea > QWidget {{ background: transparent; }}
 QScrollArea > QWidget > QWidget {{ background: transparent; }}
-QMenu {{ background: {t['card']}; color: {t['text']}; border: 1px solid {t['border']}; }}
+QScrollBar:vertical {{ background: transparent; width: 8px; margin: 0; }}
+QScrollBar::handle:vertical {{ background: {t['input_hover']}; border-radius: 4px; min-height: 24px; }}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+QMenu {{ background: {t['solid_bg']}; color: {t['text']}; border: 1px solid {t['border']}; }}
+QMenu::item:selected {{ background: {t['input_selected']}; }}
 QDialog {{ background: {t['solid_bg']}; }}
-QPushButton[seg="1"] {{ background: transparent; color: {t['muted']}; border: 1px solid {t['border']}; border-radius: 8px; padding: 3px 10px; font-size: 11px; font-weight: 700; }}
-QPushButton[seg="1"]:checked {{ background: {t['tint']}; border-color: {t['accent']}; color: {t['text']}; }}
-QComboBox {{ background: {t['card']}; color: {t['text']}; border: 1px solid {t['border']}; border-radius: 6px; padding: 3px 10px; min-width: 110px; }}
+QComboBox {{ background: {t['input_bg']}; color: {t['text']}; border: 1px solid {t['input_border']}; border-radius: 6px; padding: 3px 10px; min-width: 100px; }}
 QComboBox::drop-down {{ border: none; width: 18px; }}
-QComboBox QAbstractItemView {{ background: {t['card']}; color: {t['text']}; selection-background-color: {t['accent']}; }}
+QComboBox QAbstractItemView {{ background: {t['solid_bg']}; color: {t['text']}; selection-background-color: {t['input_selected']}; }}
 """
 
 
 # ---------------------------------------------------------------- tray helpers
+
+def _panel_markup(statuses, settings, now_utc) -> tuple[str, str, bool]:
+    """Build the applet payload: (plain_label, pango_markup, any_open).
+
+    Follows the spec: bright bold green ● for open sessions, silvery ○ for
+    closed sessions, compact signed countdowns (+04:05 / -00:35).
+    """
+    layout = settings.get("tray_layout", "compact")
+    time_as = settings.get("tray_time_as", "countdown")
+    sessions = settings.get("tray_sessions", "active_and_next")
+    is_12h = settings.get("time_format", "24h") == "12h"
+    md = settings.get("market_display", {})
+
+    def eligible(s):
+        return md.get(s["market"]["id"], "panel") == "panel"
+
+    def token(s):
+        m = s["market"]
+        name = m["symbol"] if layout == "compact" else m["name"]
+        if time_as == "local_time":
+            val = engine.format_local_clock(s["now_local"], is_12h)
+        else:
+            val = engine.format_signed_countdown(s["countdown"], s["is_open"])
+        return name, val, s["is_open"]
+
+    opens = [s for s in statuses if s["is_open"] and eligible(s)]
+    closed = sorted(
+        [s for s in statuses if not s["is_open"] and eligible(s)],
+        key=lambda x: x["countdown"].total_seconds())
+    if sessions == "active_only":
+        chosen = opens if opens else closed[:1]
+    elif sessions == "active_and_next":
+        chosen = opens + closed[:1]
+    else:
+        chosen = opens + closed
+
+    toks = [token(s) for s in chosen]
+    if not toks:
+        toks = [token(s) for s in statuses[:1]]
+    plain = "  ".join(f"{sym} {val}" for sym, val, _ in toks)
+    parts = []
+    for sym, val, op in toks:
+        if op:
+            parts.append(f'<span weight="bold" foreground="#30d158">● {sym} {val}</span>')
+        else:
+            parts.append(f'<span foreground="#cbd5e1">○ {sym} {val}</span>')
+    markup = "  ".join(parts)
+    any_open = any(s["is_open"] for s in statuses)
+    return plain, markup, any_open
+
+
+def _write_panel_status(statuses, settings, now_utc, last: dict) -> dict:
+    """Write ~/.cache/market-sync/panel_status.json for the Cinnamon applet."""
+    plain, markup, any_open = _panel_markup(statuses, settings, now_utc)
+    is_12h = settings.get("time_format", "24h") == "12h"
+    lines = []
+    for s in statuses:
+        m = s["market"]
+        state = "OPEN" if s["is_open"] else "CLOSED"
+        cd = engine.format_signed_countdown(s["countdown"], s["is_open"])
+        loc = engine.format_local_clock(s["now_local"], is_12h)
+        lines.append(f"{m['name']} ({m['symbol']}): {state} ({cd}) • {loc}")
+    payload = {
+        "label": plain or APP_NAME,
+        "markup": markup or APP_NAME,
+        "tooltip": "\n".join(lines),
+        "is_open": any_open,
+    }
+    if payload != last:
+        try:
+            os.makedirs(CACHE_DIR, exist_ok=True)
+            tmp = PANEL_STATUS_PATH + ".tmp"
+            import json as _json
+            with open(tmp, "w", encoding="utf-8") as f:
+                _json.dump(payload, f)
+            os.replace(tmp, PANEL_STATUS_PATH)
+        except Exception:
+            pass
+    return payload
+
 
 def tray_label_text(selected: dict, nxt, settings: dict, now_utc) -> str:
     """Single-market tray text: 'LON +02:14:33 14:32' (+ next event badge)."""
@@ -252,7 +438,7 @@ def tray_label_text(selected: dict, nxt, settings: dict, now_utc) -> str:
         parts.append(m["symbol"])
     if settings.get("show_countdown", True):
         parts.append(engine.format_signed_countdown(
-            selected["countdown"], selected["is_open"], include_seconds=True).replace(" ", ""))
+            selected["countdown"], selected["is_open"], include_seconds=True))
     if settings.get("show_local_time", True):
         parts.append(engine.format_local_clock(selected["now_local"], is_12h))
     text = " ".join(parts) or m["symbol"]
@@ -275,9 +461,9 @@ def make_tray_icon(text: str, is_open: bool, theme: str) -> "QIcon":
     p = QPainter(pm)
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
     p.setFont(font)
-    p.setBrush(QColor(GREEN if is_open else "#8e8e93"))
+    p.setBrush(QColor(GREEN if is_open else "#71717a"))
     p.setPen(Qt.PenStyle.NoPen)
-    p.drawEllipse(2, 8, 12, 12)  # status dot
+    p.drawEllipse(2, 8, 12, 12)
     p.setPen(QColor(t["tray_text"]))
     p.drawText(20, 0, w - 20, 28, Qt.AlignmentFlag.AlignVCenter, text)
     p.end()
@@ -285,7 +471,7 @@ def make_tray_icon(text: str, is_open: bool, theme: str) -> "QIcon":
 
 
 def make_tray_icon_multi(segments: list, theme: str) -> "QIcon":
-    """v0.2 applet style: '● LON +02:14  ○ NYC -05:02' (bright/dim)."""
+    """Top panel style: '● LON +04:05  ○ NYC -00:35' (bright/dim)."""
     t = THEMES[resolve_theme(theme)]
     font = QFont("Sans", 11, QFont.Weight.Bold)
     fm = QFontMetrics(font)
@@ -300,7 +486,7 @@ def make_tray_icon_multi(segments: list, theme: str) -> "QIcon":
     p.setFont(font)
     x = 7
     for label, (_, is_open) in zip(labels, segments):
-        p.setPen(QColor(t["tray_text"] if is_open else t["muted"]))
+        p.setPen(QColor(t["tray_text"] if is_open else t["closed"]))
         adv = fm.horizontalAdvance(label)
         p.drawText(x, 0, adv + 4, 28, Qt.AlignmentFlag.AlignVCenter, label)
         x += adv + fm.horizontalAdvance(sep)
@@ -309,7 +495,6 @@ def make_tray_icon_multi(segments: list, theme: str) -> "QIcon":
 
 
 def make_tray_logo_icon(any_open: bool, size: int = 24) -> "QIcon":
-    """v0.2 square icon: brand logo + green/gray status dot."""
     pm = QPixmap(size, size)
     pm.fill(Qt.GlobalColor.transparent)
     p = QPainter(pm)
@@ -319,7 +504,7 @@ def make_tray_logo_icon(any_open: bool, size: int = 24) -> "QIcon":
         r = QSvgRenderer(logo_path)
         r.render(p, QRectF(2, 2, size - 4, size - 4))
     else:
-        p.setBrush(QColor("#23262b"))
+        p.setBrush(QColor(CYAN))
         p.setPen(Qt.PenStyle.NoPen)
         p.drawEllipse(2, 2, size - 4, size - 4)
     p.setBrush(QColor(GREEN if any_open else "#71717a"))
@@ -330,7 +515,6 @@ def make_tray_logo_icon(any_open: bool, size: int = 24) -> "QIcon":
 
 
 def _next_nyse_holiday_line(now_utc=None) -> str:
-    """Bank-holiday parity: next NYSE full closure."""
     from datetime import timedelta
     from zoneinfo import ZoneInfo
     from markets import nyse_holidays
@@ -368,7 +552,7 @@ def landmark_menu_icon(market: dict, size: int = 16) -> "QIcon":
 
 if HAS_QT:
     class LandmarkBadge(QWidget):
-        """Circular glass badge with the market's landmark SVG (v0.2 style)."""
+        """Circular badge with the market's landmark vector (26px in cards)."""
 
         def __init__(self, landmark: str, symbol: str, size: int = 26):
             super().__init__()
@@ -376,7 +560,8 @@ if HAS_QT:
             self._symbol = symbol
             self._size = size
             self.setFixedSize(size, size)
-            self._bg = QColor("rgba(241, 245, 249, 0.85)")
+            self._bg = QColor("rgba(34, 40, 58, 0.85)")
+            self._fg = QColor("#f1f5f9")
 
         def set_landmark(self, landmark: str, symbol: str):
             if landmark != self._landmark or symbol != self._symbol:
@@ -384,7 +569,8 @@ if HAS_QT:
                 self.update()
 
         def set_theme(self, t: dict):
-            self._bg = QColor(t["badge_bg"])
+            self._bg = qcolor(t["badge_bg"])
+            self._fg = QColor(t["text"])
             self.update()
 
         def paintEvent(self, _ev):
@@ -392,16 +578,15 @@ if HAS_QT:
             p.setRenderHint(QPainter.RenderHint.Antialiasing)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(self._bg)
-            p.drawEllipse(1, 1, self._size - 2, self._size - 2)
+            p.drawEllipse(0, 0, self._size, self._size)
             path = _svg_path(self._landmark)
             if HAS_SVG and os.path.exists(path):
                 r = QSvgRenderer(path)
-                inset = max(4, self._size // 6)
+                inset = max(5, self._size // 5)
                 r.render(p, QRectF(inset, inset, self._size - 2 * inset, self._size - 2 * inset))
             else:
-                p.setPen(QColor("#ffffff"))
-                f = QFont("Sans", max(7, self._size // 3), QFont.Weight.Bold)
-                p.setFont(f)
+                p.setPen(self._fg)
+                p.setFont(app_font(max(8, self._size // 3), QFont.Weight.Bold))
                 p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self._symbol[:3])
             p.end()
 else:
@@ -412,33 +597,35 @@ else:
 
 if HAS_QT:
     class MiniRingTimer(QWidget):
-        """Small progress ring beside the OPEN/CLOSED pill on market cards."""
+        """20px progress ring: neon green arc while open, faint track closed."""
 
-        def __init__(self, size: int = 18):
+        def __init__(self, size: int = 20):
             super().__init__()
             self.setFixedSize(size, size)
             self._frac = 0.0
             self._open = False
-            self._track = QColor("rgba(255, 255, 255, 0.1)")
+            self._track = QColor("rgba(255, 255, 255, 0.12)")
+            self._arc = QColor(GREEN)
 
         def set_state(self, frac: float, is_open: bool, t: dict):
             self._frac = min(1.0, max(0.0, frac))
             self._open = is_open
-            self._track = QColor(t["ring_track"])
+            self._track = qcolor(t["ring_track"])
+            self._arc = qcolor(t["green"])
             self.update()
 
         def paintEvent(self, _ev):
             p = QPainter(self)
             p.setRenderHint(QPainter.RenderHint.Antialiasing)
-            w = 2.5
+            w = 2.8
             rect = QRectF(w, w, self.width() - 2 * w, self.height() - 2 * w)
             p.setPen(QPen(self._track, w, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
             p.drawArc(rect, 0, 360 * 16)
-            p.setPen(QPen(QColor(GREEN if self._open else RED), w,
-                          Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-            span = int(-self._frac * 360 * 16)
-            if abs(span) > 16:
-                p.drawArc(rect, 90 * 16, span)
+            if self._open:
+                p.setPen(QPen(self._arc, w, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+                span = int(-self._frac * 360 * 16)
+                if abs(span) > 16:
+                    p.drawArc(rect, 90 * 16, span)
             p.end()
 else:
     class MiniRingTimer:  # type: ignore
@@ -448,9 +635,12 @@ else:
 
 if HAS_QT:
     class MarketCardWidget(QFrame):
-        """v0.2 Material glass card (88px): landmark + name + local clock on
-        top; signed countdown + OPEN/CLOSED pill + mini ring below. Bright
-        while open, dimmed while closed (unless brighten is disabled)."""
+        """Design System v2.0 market card (82px).
+
+        Upper row: landmark badge • name • local time.
+        Lower row: big signed countdown • OPEN/CLOSED pill • 20px ring.
+        Active card: green illuminated border + green-tinted glass.
+        """
 
         clicked = pyqtSignal(str)
 
@@ -458,7 +648,7 @@ if HAS_QT:
             super().__init__(parent)
             self.market = market
             self.setObjectName("MarketCard")
-            self.setFixedHeight(88)
+            self.setFixedHeight(82)
             self.setCursor(Qt.CursorShape.PointingHandCursor)
 
             lay = QVBoxLayout(self)
@@ -470,34 +660,26 @@ if HAS_QT:
             self.badge = LandmarkBadge(market.get("landmark", "london"), market["symbol"], 26)
             top.addWidget(self.badge)
             self.name_label = QLabel(market["name"])
-            nf = QFont("Sans", 11)
-            nf.setWeight(QFont.Weight.DemiBold)
-            self.name_label.setFont(nf)
+            self.name_label.setFont(app_font(13, QFont.Weight.DemiBold))
             top.addWidget(self.name_label)
             top.addStretch(1)
             self.time_label = QLabel("00:00")
-            tf = QFont("Sans", 11)
-            tf.setWeight(QFont.Weight.Medium)
-            self.time_label.setFont(tf)
+            self.time_label.setFont(app_font(11, QFont.Weight.Medium))
             top.addWidget(self.time_label)
             lay.addLayout(top)
 
             bot = QHBoxLayout()
-            bot.setSpacing(5)
-            self.cd_label = QLabel("+ 00:00")
-            cf = QFont("Sans", 15)
-            cf.setWeight(QFont.Weight.Bold)
-            self.cd_label.setFont(cf)
+            bot.setSpacing(6)
+            self.cd_label = QLabel("+00:00")
+            self.cd_label.setFont(mono_font(22))
             bot.addWidget(self.cd_label)
             bot.addStretch(1)
             self.pill = QLabel("OPEN")
             self.pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.pill.setFixedSize(54, 18)
-            pf = QFont("Sans", 8)
-            pf.setWeight(QFont.Weight.Bold)
-            self.pill.setFont(pf)
+            self.pill.setFixedSize(56, 18)
+            self.pill.setFont(app_font(9, QFont.Weight.Bold))
             bot.addWidget(self.pill)
-            self.ring = MiniRingTimer(18)
+            self.ring = MiniRingTimer(20)
             bot.addWidget(self.ring)
             lay.addLayout(bot)
 
@@ -511,43 +693,45 @@ if HAS_QT:
             is_open = bool(status["is_open"])
             self.badge.set_theme(t)
             self.time_label.setText(engine.format_local_clock(status["now_local"], is_12h))
+            self.time_label.setStyleSheet(f"color: {t['secondary']};")
             self.cd_label.setText(engine.format_signed_countdown(status["countdown"], is_open))
 
-            bright = is_open and brighten
-            if bright:
-                self.time_label.setStyleSheet(f"color: {t['muted']}; font-size: 11px;")
-                self.name_label.setStyleSheet("font-weight: 800; font-size: 12px;")
+            if is_open and brighten:
                 self.cd_label.setStyleSheet(
-                    f"font-family: monospace; font-size: 15px; font-weight: 800; color: {GREEN};")
-                bg, bd = t["card_open"], t["card_border_open"]
+                    f"color: {t['green']}; font-family: monospace; font-weight: 800;")
+                self.name_label.setStyleSheet(f"color: {t['text']};")
+                bg, bd, bw = t["card_active"], t["card_border_active"], "1.5px"
+            elif is_open:
+                self.cd_label.setStyleSheet(f"color: {t['text']}; font-family: monospace;")
+                self.name_label.setStyleSheet(f"color: {t['text']};")
+                bg, bd, bw = t["card"], t["card_border_hover"], "1px"
             elif brighten:
-                self.time_label.setStyleSheet(f"color: {t['muted']}; font-size: 11px;")
-                self.name_label.setStyleSheet(f"font-weight: 800; font-size: 12px; color: {t['muted']};")
-                self.cd_label.setStyleSheet(
-                    f"font-family: monospace; font-size: 15px; font-weight: 800; color: {t['muted']};")
-                bg, bd = t["card_closed"], t["card_border_closed"]
+                # muted off-state: readable silvery slate, not dead gray
+                self.cd_label.setStyleSheet(f"color: {t['closed']}; font-family: monospace;")
+                self.name_label.setStyleSheet(f"color: {t['text']};")
+                bg, bd, bw = t["card"], t["card_border"], "1px"
             else:
-                # brighten disabled: uniform cards, state only via the pill
-                self.time_label.setStyleSheet(f"color: {t['muted']}; font-size: 11px;")
-                self.name_label.setStyleSheet("font-weight: 800; font-size: 12px;")
-                self.cd_label.setStyleSheet(
-                    f"font-family: monospace; font-size: 15px; font-weight: 800; color: {t['text']};")
-                bg, bd = t["card"], t["card_border_closed"]
+                self.cd_label.setStyleSheet(f"color: {t['text']}; font-family: monospace;")
+                self.name_label.setStyleSheet(f"color: {t['text']};")
+                bg, bd, bw = t["card"], t["card_border"], "1px"
 
             if is_open:
                 self.pill.setText("OPEN")
                 self.pill.setStyleSheet(
                     f"background: {t['pill_open_bg']}; color: {t['pill_open_text']};"
-                    "border-radius: 5px; font-weight: bold;")
+                    "border-radius: 9px; font-weight: bold;")
             else:
                 self.pill.setText("CLOSED")
                 self.pill.setStyleSheet(
                     f"background: {t['pill_closed_bg']}; color: {t['pill_closed_text']};"
-                    "border-radius: 5px; font-weight: bold;")
-            bcol = t["accent"] if selected else bd
-            bw = "1.5px" if (selected or is_open) else "1px"
+                    "border-radius: 9px; font-weight: bold;")
+
+            if selected:
+                bd, bw = t["input_border_selected"], "1.5px"
             self.setStyleSheet(
-                f"QFrame#MarketCard {{ background: {bg}; border: {bw} solid {bcol}; border-radius: 12px; }}")
+                f"QFrame#MarketCard {{ background: {bg};"
+                f" border: {bw} solid {bd}; border-radius: 10px; }}"
+                f"QFrame#MarketCard:hover {{ border: 1px solid {t['card_border_hover']}; }}")
             self.ring.set_state(status.get("progress", 0.0), is_open, t)
 else:
     class MarketCardWidget:  # type: ignore
@@ -557,61 +741,61 @@ else:
 
 if HAS_QT:
     class NewsRowWidget(QFrame):
-        """v0.2 news row: relative time • impact pill • currency pill • title."""
+        """Design System v2.0 news row: relative time • impact • currency • title."""
 
         def __init__(self, parent: QWidget | None = None):
             super().__init__(parent)
+            self.setFixedHeight(30)
             lay = QHBoxLayout(self)
-            lay.setContentsMargins(8, 3, 8, 3)
-            lay.setSpacing(8)
+            lay.setContentsMargins(8, 2, 8, 2)
+            lay.setSpacing(7)
 
             self.rel_label = QLabel("--")
-            rf = QFont("Sans", 11)
-            rf.setWeight(QFont.Weight.Bold)
-            self.rel_label.setFont(rf)
-            self.rel_label.setFixedWidth(52)
+            self.rel_label.setFont(mono_font(11))
+            self.rel_label.setFixedWidth(56)
             self.rel_label.setAlignment(
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             lay.addWidget(self.rel_label)
 
             self.imp_pill = QLabel("LOW")
-            ipf = QFont("Sans", 8)
-            ipf.setWeight(QFont.Weight.Bold)
-            self.imp_pill.setFont(ipf)
+            self.imp_pill.setFont(app_font(8, QFont.Weight.Bold))
             self.imp_pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.imp_pill.setFixedSize(36, 17)
+            self.imp_pill.setFixedSize(40, 17)
             lay.addWidget(self.imp_pill)
 
             self.cur_pill = QLabel("USD")
-            cpf = QFont("Sans", 9)
-            cpf.setWeight(QFont.Weight.Bold)
-            self.cur_pill.setFont(cpf)
+            self.cur_pill.setFont(app_font(9, QFont.Weight.Bold))
             self.cur_pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.cur_pill.setFixedSize(36, 17)
+            self.cur_pill.setFixedSize(40, 17)
             lay.addWidget(self.cur_pill)
 
             self.title_label = QLabel("")
-            ttf = QFont("Sans", 11)
-            self.title_label.setFont(ttf)
+            self.title_label.setFont(app_font(11))
             lay.addWidget(self.title_label, 1)
 
-        def update_data(self, ev: dict, theme: dict, now_utc):
+        def update_data(self, ev: dict, theme: dict, theme_name: str, now_utc):
+            is_dark = theme_name not in ("light", "mint_light")
+            self.setStyleSheet(
+                f"QFrame {{ background: {theme['row_bg']};"
+                f" border: 1px solid {theme['row_border']}; border-radius: 6px; }}")
             dt = ev.get("_dt")
             self.rel_label.setText(calendar_api.relative_time(dt, now_utc) if dt else "--")
-            self.rel_label.setStyleSheet(f"color: {theme['text']};")
+            self.rel_label.setStyleSheet(f"color: {theme['secondary']};")
 
             imp = ev.get("impact", "Low")
-            fg, bg = PILL_STYLE.get(imp, PILL_STYLE["Low"])
-            self.imp_pill.setText(imp[:3].upper())
+            variant = IMPACT_STYLE.get(imp, IMPACT_STYLE["Low"])["dark" if is_dark else "light"]
+            fg, bg, border = variant
+            self.imp_pill.setText(IMPACT_SHORT.get(imp, imp[:3].upper()))
             self.imp_pill.setStyleSheet(
-                f"background: {bg}; color: {fg}; border: 1px solid {fg};"
+                f"background: {bg}; color: {fg}; border: 1px solid {border};"
                 "border-radius: 4px; font-weight: bold;")
 
             cur = (ev.get("currency") or ev.get("country") or "").upper()
+            c_fg = CURRENCY_COLORS.get(cur, theme["cyan"])
             self.cur_pill.setText(cur[:3])
-            c_fg, c_bg = CURRENCY_COLORS.get(cur, (ACCENT, "rgba(56, 189, 248, 0.16)"))
             self.cur_pill.setStyleSheet(
-                f"background: {c_bg}; color: {c_fg}; border-radius: 4px; font-weight: bold;")
+                f"background: {theme['input_bg']}; color: {c_fg};"
+                "border: 1px solid " + theme["row_border"] + ";" "border-radius: 4px; font-weight: bold;")
 
             self.title_label.setText(ev.get("title", "Event"))
             self.title_label.setStyleSheet(f"color: {theme['text']};")
@@ -623,7 +807,7 @@ else:
 
 if HAS_QT:
     class UpNextDrawer(QFrame):
-        """Collapsible v0.2 news drawer: trigger bar • chips • rows • date bar."""
+        """Up Next drawer: header + impact chips + rows + date bar (v2.0)."""
 
         def __init__(self, controller: "TrayController"):
             super().__init__()
@@ -635,32 +819,11 @@ if HAS_QT:
             lay.setContentsMargins(0, 0, 0, 0)
             lay.setSpacing(0)
 
-            # collapsed trigger bar
-            self.trigger = QFrame()
-            self.trigger.setFixedHeight(34)
-            self.trigger.setCursor(Qt.CursorShape.PointingHandCursor)
-            tl = QHBoxLayout(self.trigger)
-            tl.setContentsMargins(12, 0, 12, 0)
-            tl.setSpacing(8)
-            self.trigger_label = QLabel("Upcoming Events…")
-            self.trigger_label.setStyleSheet("font-size: 11px;")
-            tl.addWidget(self.trigger_label, 1)
-            self.trigger_chevron = QLabel("⌃")
-            self.trigger_chevron.setStyleSheet("font-size: 13px;")
-            tl.addWidget(self.trigger_chevron)
-            self.trigger.mousePressEvent = lambda e: self.toggle()
-            lay.addWidget(self.trigger)
-
-            # expanded area
-            self.expanded = QWidget()
-            el = QVBoxLayout(self.expanded)
-            el.setContentsMargins(0, 0, 0, 0)
-            el.setSpacing(0)
-
+            # header: UP NEXT + chips
             header = QFrame()
             header.setFixedHeight(30)
             hl = QHBoxLayout(header)
-            hl.setContentsMargins(12, 2, 12, 2)
+            hl.setContentsMargins(4, 2, 4, 2)
             hl.setSpacing(5)
             cap = QLabel("UP NEXT")
             cap.setProperty("class", "caption")
@@ -679,39 +842,39 @@ if HAS_QT:
                 b.clicked.connect(self._on_chip)
                 hl.addWidget(b)
                 self.chips[lvl] = b
-            el.addWidget(header)
+            lay.addWidget(header)
 
+            # scrollable rows (spec: 175px)
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
-            scroll.setFixedHeight(150)
+            scroll.setFixedHeight(175)
             inner = QWidget()
             self.rows_layout = QVBoxLayout(inner)
-            self.rows_layout.setSpacing(2)
-            self.rows_layout.setContentsMargins(8, 2, 8, 4)
+            self.rows_layout.setSpacing(4)
+            self.rows_layout.setContentsMargins(4, 2, 4, 4)
             self.rows_layout.addStretch(1)
             scroll.setWidget(inner)
-            el.addWidget(scroll)
+            lay.addWidget(scroll)
 
+            # bottom bar: date pill + collapse
             datebar = QFrame()
-            datebar.setFixedHeight(26)
+            datebar.setFixedHeight(28)
             dl = QHBoxLayout(datebar)
-            dl.setContentsMargins(14, 0, 10, 0)
+            dl.setContentsMargins(8, 2, 4, 2)
             self.date_label = QLabel(datetime.now().strftime("%d %b"))
-            self.date_label.setStyleSheet("font-size: 10px;")
+            self.date_label.setFont(app_font(10, QFont.Weight.DemiBold))
             dl.addWidget(self.date_label)
             dl.addStretch(1)
-            self.collapse_btn = QPushButton("⌄")
+            self.collapse_btn = QPushButton("▴")
             self.collapse_btn.setProperty("class", "bar")
             self.collapse_btn.setFixedSize(24, 20)
             self.collapse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.collapse_btn.clicked.connect(self.toggle)
+            self.collapse_btn.setToolTip("Collapse Up Next")
+            self.collapse_btn.clicked.connect(lambda: self.c.set_drawer_expanded(False))
             dl.addWidget(self.collapse_btn)
-            el.addWidget(datebar)
+            lay.addWidget(datebar)
 
-            lay.addWidget(self.expanded)
-            self.set_expanded(bool(controller.settings.get("news_drawer_expanded", True)))
-
-        # -- chips (v0.2 multi-select)
+        # -- chips (multi-select)
         def _on_all(self):
             state = self.chip_all.isChecked()
             for b in self.chips.values():
@@ -735,35 +898,15 @@ if HAS_QT:
             self.chip_all.setChecked(len(active) == 3)
             self.chip_all.blockSignals(False)
 
-        # -- expand/collapse
-        def toggle(self):
-            self.set_expanded(not self.expanded.isVisible())
-
-        def set_expanded(self, expanded: bool):
-            self.expanded.setVisible(expanded)
-            self.trigger.setVisible(not expanded)
-            self.c.settings["news_drawer_expanded"] = expanded
-            self.c._save()
-
         # -- content
-        def update_events(self, shown: list, nxt, now_utc):
+        def update_events(self, shown: list, now_utc):
             t = THEMES[self.c.panel._theme]
+            name = self.c.panel._theme
             self.date_label.setText(
-                datetime.now().strftime("%d %b") + "  •  💻 " +
+                datetime.now().strftime("%d %b") + "  •  " +
                 engine.format_local_clock(now_utc.astimezone(),
                                           self.c.settings.get("time_format") == "12h"))
-            self.date_label.setStyleSheet(f"color: {t['muted']}; font-size: 10px;")
-            self.trigger_label.setStyleSheet(f"color: {t['text']}; font-size: 11px;")
-            self.trigger_chevron.setStyleSheet(f"color: {t['muted']}; font-size: 13px;")
-            if nxt and nxt.get("_dt"):
-                rel = calendar_api.relative_time(nxt["_dt"], now_utc)
-                dot = PILL_DOT.get(nxt.get("impact", "Low"), "🟡")
-                self.trigger_label.setText(
-                    f"{rel} To next event ({dot} {nxt.get('currency', '')} "
-                    f"{nxt.get('title', '')[:22]})")
-            else:
-                self.trigger_label.setText("Upcoming Events…")
-
+            self.date_label.setStyleSheet(f"color: {t['secondary']};")
             sig = [(e.get("currency"), e.get("title"), e.get("date_utc"), e.get("impact"))
                    for e in shown]
             if sig != self._sig:
@@ -776,19 +919,19 @@ if HAS_QT:
                 self._rows = []
                 if not shown:
                     lab = QLabel("No upcoming economic events")
-                    lab.setProperty("class", "muted")
+                    lab.setStyleSheet(f"color: {t['muted']}; font-size: 11px;")
                     lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
                     self.rows_layout.insertWidget(0, lab)
                     self._rows = [lab]
                 for e in shown:
                     row = NewsRowWidget()
-                    row.update_data(e, t, now_utc)
+                    row.update_data(e, t, name, now_utc)
                     self.rows_layout.insertWidget(self.rows_layout.count() - 1, row)
                     self._rows.append(row)
             else:
                 for row, e in zip(self._rows, shown):
                     if hasattr(row, "update_data"):
-                        row.update_data(e, t, now_utc)
+                        row.update_data(e, t, name, now_utc)
 else:
     class UpNextDrawer:  # type: ignore
         def __init__(self, *a, **k):
@@ -796,30 +939,40 @@ else:
 
 
 class SessionPanel(QWidget):
-    """Market Sync v0.2 glass popover: market grid -> brand bar -> Up Next."""
+    """Market Sync v2.0 frosted-glass dropdown (410px, radius 14).
+
+    Shell is a QFrame#PanelRoot container (QSS backgrounds paint reliably on
+    QFrame — a bare custom QWidget would silently skip them).
+    """
 
     def __init__(self, controller: "TrayController"):
         super().__init__()
         self.c = controller
         self._theme = "dark"
-        self.setObjectName("PanelRoot")
         self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.Popup
-            | Qt.WindowType.NoDropShadowWindowHint
+            Qt.WindowType.Tool
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setFixedWidth(410)
 
-        root = QVBoxLayout(self)
-        root.setContentsMargins(10, 8, 10, 8)
-        root.setSpacing(7)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        self.root = QFrame()
+        self.root.setObjectName("PanelRoot")
+        outer.addWidget(self.root)
 
-        # ---- 1. market cards grid (v0.2 order & look)
+        root = QVBoxLayout(self.root)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(8)
+
+        # 1. market cards grid (2 columns, v0.2 order)
         self.cards: dict[str, MarketCardWidget] = {}
         self.grid = QGridLayout()
         self.grid.setContentsMargins(0, 0, 0, 0)
-        self.grid.setSpacing(7)
+        self.grid.setSpacing(8)
         self.grid.setColumnStretch(0, 1)
         self.grid.setColumnStretch(1, 1)
         for m in MARKETS:
@@ -829,7 +982,7 @@ class SessionPanel(QWidget):
         root.addLayout(self.grid)
         self.rebuild_grid()
 
-        # ---- 2. brand bar: logo + title + theme/alerts/preferences/close
+        # 2. brand bar (32px): logo + MARKET SYNC + drawer + bell + gear + close
         brand = QHBoxLayout()
         brand.setSpacing(4)
         self.logo = QLabel()
@@ -846,46 +999,54 @@ class SessionPanel(QWidget):
         self.logo.setPixmap(logo_pm)
         brand.addWidget(self.logo)
         self.title = QLabel("MARKET SYNC")
-        tf = QFont("Sans", 9, QFont.Weight.Bold)
-        tf.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.2)
+        tf = app_font(9, QFont.Weight.Bold)
+        try:
+            tf.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.0)
+        except Exception:
+            pass
         self.title.setFont(tf)
-        self.title.setStyleSheet("font-weight: 800;")
         brand.addWidget(self.title)
         brand.addStretch(1)
-        self.theme_btn = QPushButton("🌙")
-        self.theme_btn.setProperty("class", "bar")
-        self.theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.theme_btn.setToolTip("Theme (click to cycle)")
-        self.theme_btn.clicked.connect(self.c.cycle_theme)
-        brand.addWidget(self.theme_btn)
+
+        self.drawer_btn = QPushButton("▾")
+        self.drawer_btn.setProperty("class", "bar")
+        self.drawer_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.drawer_btn.setToolTip("Expand / collapse Up Next")
+        self.drawer_btn.clicked.connect(self.toggle_drawer)
+        brand.addWidget(self.drawer_btn)
+
         self.bell_btn = QPushButton("🔔")
         self.bell_btn.setProperty("class", "bar")
         self.bell_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.bell_btn.setToolTip("Notifications on / off")
         self.bell_btn.clicked.connect(self.c.toggle_alerts)
         brand.addWidget(self.bell_btn)
+
         self.gear_btn = QPushButton("⚙️")
         self.gear_btn.setProperty("class", "bar")
         self.gear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.gear_btn.setToolTip("Preferences")
         self.gear_btn.clicked.connect(self.c.open_preferences)
         brand.addWidget(self.gear_btn)
+
         self.close_btn = QPushButton("✕")
         self.close_btn.setProperty("class", "bar")
         self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.close_btn.setToolTip("Hide panel (app keeps running in tray)")
+        self.close_btn.setToolTip("Hide panel (app keeps running)")
         self.close_btn.clicked.connect(self.hide)
         brand.addWidget(self.close_btn)
         root.addLayout(brand)
 
-        # ---- 3. Up Next drawer
+        # 3. Up Next drawer
         self.drawer = UpNextDrawer(controller)
+        self.drawer.setVisible(bool(controller.settings.get("news_drawer_expanded", True)))
         root.addWidget(self.drawer)
+        self._sync_drawer_btn()
 
         self.apply_theme()
 
+    # -- grid routing (none hides a card, popup keeps it panel-only)
     def rebuild_grid(self):
-        """v0.2 market routing: 'none' hides the card, others show it."""
         md = self.c.settings.get("market_display", {})
         enabled = [m for m in MARKETS if md.get(m["id"], "panel") != "none"]
         while self.grid.count():
@@ -897,11 +1058,22 @@ class SessionPanel(QWidget):
             card.show()
             r, col = divmod(idx, 2)
             if idx == len(enabled) - 1 and len(enabled) % 2 == 1:
-                self.grid.addWidget(card, r, 0, 1, 2)  # last card spans full width
+                self.grid.addWidget(card, r, 0, 1, 2)
             else:
                 self.grid.addWidget(card, r, col)
 
-    # Panel must NOT stick over other apps: hide when it loses focus
+    # -- drawer state
+    def toggle_drawer(self):
+        self.c.set_drawer_expanded(not self.drawer.isVisible())
+
+    def set_drawer_expanded(self, expanded: bool):
+        self.drawer.setVisible(expanded)
+        self._sync_drawer_btn()
+
+    def _sync_drawer_btn(self):
+        self.drawer_btn.setText("▴" if self.drawer.isVisible() else "▾")
+
+    # -- focus behaviour (hide when clicking another app)
     def changeEvent(self, ev):
         try:
             if ev.type() == QEvent.Type.ActivationChange and not self.isActiveWindow():
@@ -927,26 +1099,24 @@ class SessionPanel(QWidget):
             self.c.menu.setStyleSheet(stylesheet(t))
         except Exception:
             pass
-        want = self.c.settings.get("theme", "system")
-        self.theme_btn.setText(THEME_ICON.get(want, "🖥️"))
-        self.theme_btn.setToolTip(f"Theme: {THEME_LABELS.get(want, want)} (click to cycle)")
-        # v0.2 chips: semantic colors, tinted when checked
+        # chips: impact colors tinted when checked
+        base_colors = {"High": "#ef4444", "Medium": "#f97316", "Low": "#eab308"}
         for lvl, b in self.drawer.chips.items():
-            base = CHIP_BASE[lvl]
+            base = base_colors[lvl]
             c = QColor(base)
-            tint = f"rgba({c.red()}, {c.green()}, {c.blue()}, 51)"
+            tint = f"rgba({c.red()}, {c.green()}, {c.blue()}, 46)"
             b.setStyleSheet(
-                f"QPushButton {{ background: transparent; color: {t['muted']}; "
-                f"border: 1px solid {t['border']}; border-radius: 10px; "
-                f"padding: 2px 7px; font-size: 10px; font-weight: 700; }}"
+                f"QPushButton {{ background: {t['input_bg']}; color: {t['secondary']};"
+                f" border: 1px solid {t['input_border']}; border-radius: 10px;"
+                " padding: 2px 8px; font-size: 10px; font-weight: 700; }"
                 f"QPushButton:checked {{ color: {base}; border-color: {base}; background: {tint}; }}")
-        c = QColor(t["accent"])
-        tint = f"rgba({c.red()}, {c.green()}, {c.blue()}, 51)"
+        c = QColor(t["cyan"])
+        tint = f"rgba({c.red()}, {c.green()}, {c.blue()}, 46)"
         self.drawer.chip_all.setStyleSheet(
-            f"QPushButton {{ background: transparent; color: {t['muted']}; "
-            f"border: 1px solid {t['border']}; border-radius: 10px; "
-            f"padding: 2px 10px; font-size: 10px; font-weight: 700; }}"
-            f"QPushButton:checked {{ color: {t['accent']}; border-color: {t['accent']}; background: {tint}; }}")
+            f"QPushButton {{ background: {t['input_bg']}; color: {t['secondary']};"
+            f" border: 1px solid {t['input_border']}; border-radius: 10px;"
+            " padding: 2px 10px; font-size: 10px; font-weight: 700; }"
+            f"QPushButton:checked {{ color: {t['cyan']}; border-color: {t['cyan']}; background: {tint}; }}")
 
     def render(self, statuses, selected, news, news_note, now_utc):
         if resolve_theme(self.c.settings.get("theme", "system")) != self._theme:
@@ -956,32 +1126,25 @@ class SessionPanel(QWidget):
         is_12h = self.c.settings.get("time_format", "24h") == "12h"
         brighten = bool(self.c.settings.get("active_brighten", True))
 
-        # market cards
         for s in statuses:
             mid = s["market"]["id"]
             if mid in self.cards:
                 self.cards[mid].update_data(s, t, mid == sel_id, is_12h, brighten)
 
-        # alerts bell state
         self.bell_btn.setText("🔔" if self.c.settings.get("alerts_enabled", True) else "🔕")
 
-        # drawer: chips + events
         active = list(self.c.settings.get("active_impacts", ["High", "Medium", "Low"]))
         self.drawer.sync_chips(active)
         shown = calendar_api.filter_events(
             news, self.c.settings["currencies"], None, 72, now_utc,
             active_impacts=active)
-        nxt = calendar_api.next_event(
-            news, self.c.settings["currencies"], None, now_utc,
-            active_impacts=active)
-        self.drawer.update_events(shown[:16], nxt, now_utc)
+        self.drawer.update_events(shown[:16], now_utc)
 
 
 if HAS_QT:
     class PreferencesDialog(QDialog):
-        """v0.2-style preferences: segmented display controls, live tray
-        preview, per-market routing (none / popup / tray), news, startup,
-        updates and a Quit button."""
+        """Design System v2.0 preferences (380px): display card with live
+        preview, segments, market routing table, startup, updates, footer."""
 
         def __init__(self, controller: "TrayController"):
             super().__init__()
@@ -990,11 +1153,11 @@ if HAS_QT:
             self._check_result = _UNSET
             self._t = THEMES[resolve_theme(s.get("theme", "system"))]
             self.setWindowTitle(f"{APP_NAME} — Preferences")
-            self.setFixedSize(460, 620)
+            self.setFixedSize(380, 640)
             self.setStyleSheet(stylesheet(self._t))
 
             root = QVBoxLayout(self)
-            root.setContentsMargins(14, 12, 14, 12)
+            root.setContentsMargins(12, 12, 12, 12)
             root.setSpacing(8)
 
             scroll = QScrollArea()
@@ -1014,22 +1177,27 @@ if HAS_QT:
             def row(label, widget):
                 h = QHBoxLayout()
                 lab = QLabel(label)
-                lab.setFixedWidth(110)
+                lab.setFixedWidth(96)
+                lab.setFont(app_font(11, QFont.Weight.DemiBold))
                 h.addWidget(lab)
                 h.addWidget(widget)
                 h.addStretch(1)
                 form.addLayout(h)
 
-            # ---- live tray preview
+            # ---- launch at login
+            self.autostart_chk = QCheckBox("Launch at Login (silent, in tray)")
+            self.autostart_chk.setChecked(is_autostart_enabled())
+            form.addWidget(self.autostart_chk)
+
+            # ---- display card with live preview
+            section("Menu Bar & Top Panel Display")
             self.preview = QLabel("")
             self.preview.setWordWrap(True)
             self.preview.setStyleSheet(
-                f"background: {self._t['tint']}; border: 1px solid {self._t['border']};"
+                f"background: {self._t['input_bg']}; border: 1px solid {self._t['input_border']};"
                 "border-radius: 10px; padding: 8px 10px; font-size: 12px;")
             form.addWidget(self.preview)
 
-            # ---- Menu & Tray Display (v0.2 segmented controls)
-            section("Menu & Tray Display")
             self.seg_layout = self._seg(
                 [("compact", "Compact Symbols"), ("standard", "Standard Names")],
                 s.get("tray_layout", "compact"))
@@ -1044,34 +1212,36 @@ if HAS_QT:
             self.seg_sessions = self._seg(
                 [("active_only", "Active Only"), ("active_and_next", "Active + Next"),
                  ("all", "All")], s.get("tray_sessions", "active_and_next"))
-            row("Tray sessions", self.seg_sessions)
-            self.seg_icon = self._seg(
-                [("text", "Text"), ("logo", "Logo + dot")],
-                s.get("tray_icon_style", "text"))
-            row("Tray icon", self.seg_icon)
-            self.brighten_chk = QCheckBox("Active markets brighten; off sessions are dimmed")
+            row("Panel Sessions", self.seg_sessions)
+
+            self.standalone_chk = QCheckBox(
+                "Show standalone tray icon alongside panel applet")
+            self.standalone_chk.setChecked(bool(s.get("show_standalone_tray", True)))
+            form.addWidget(self.standalone_chk)
+
+            self.brighten_chk = QCheckBox("Active markets brighten; off sessions dim")
             self.brighten_chk.setChecked(bool(s.get("active_brighten", True)))
             self.brighten_chk.toggled.connect(self._refresh_preview)
             form.addWidget(self.brighten_chk)
 
-            # ---- Market List (v0.2 routing: none / popup / tray)
-            section("Market List")
+            # ---- market tracking table
+            section("Market Tracking")
             self.route_segs: dict = {}
             md = s.get("market_display", {})
             for m in MARKETS:
                 h = QHBoxLayout()
                 lab = QLabel(f"{m['name']} ({m['symbol']})")
-                lab.setFixedWidth(150)
+                lab.setFixedWidth(130)
                 h.addWidget(lab)
                 seg = self._seg(
-                    [("none", "None"), ("popup", "Popup"), ("panel", "+ Tray")],
+                    [("none", "none"), ("popup", "popup"), ("panel", "+ panel")],
                     md.get(m["id"], "panel"), preview=False)
                 h.addWidget(seg)
                 h.addStretch(1)
                 form.addLayout(h)
                 self.route_segs[m["id"]] = seg
 
-            # ---- News
+            # ---- news
             section("News")
             active = set(s.get("active_impacts", ["High", "Medium", "Low"]))
             improw = QHBoxLayout()
@@ -1100,11 +1270,11 @@ if HAS_QT:
             idx = [i for i, mm in enumerate((5, 10, 15, 30, 60)) if mm == cur_min]
             self.refresh_cb.setCurrentIndex(idx[0] if idx else 2)
             row("Refresh news", self.refresh_cb)
-            self.alerts_chk = QCheckBox("Desktop notifications (market + high-impact news)")
+            self.alerts_chk = QCheckBox("Desktop notifications")
             self.alerts_chk.setChecked(bool(s.get("alerts_enabled", True)))
             form.addWidget(self.alerts_chk)
 
-            # ---- Window & Startup
+            # ---- window & startup
             section("Window & Startup")
             self.theme_cb = QComboBox()
             for key in THEME_ORDER:
@@ -1116,36 +1286,28 @@ if HAS_QT:
                 self.sel_cb.addItem(f"{m['flag']}  {m['name']}", m["id"])
             self.sel_cb.setCurrentIndex(MARKET_IDS.index(s.get("selected_market", "LONDON")))
             row("Default market", self.sel_cb)
-            self.drawer_chk = QCheckBox("Open news drawer by default")
+            self.drawer_chk = QCheckBox("Open Up Next drawer by default")
             self.drawer_chk.setChecked(bool(s.get("news_drawer_expanded", True)))
             form.addWidget(self.drawer_chk)
             self.autohide_chk = QCheckBox("Hide panel when clicking another app")
             self.autohide_chk.setChecked(bool(s.get("auto_hide_panel", True)))
             form.addWidget(self.autohide_chk)
-            self.leftclick_cb = QComboBox()
-            self.leftclick_cb.addItem("Open panel", "panel")
-            self.leftclick_cb.addItem("Open menu", "menu")
-            self.leftclick_cb.setCurrentIndex(
-                0 if s.get("left_click_action", "panel") == "panel" else 1)
-            row("Left-click icon", self.leftclick_cb)
-            self.autostart_chk = QCheckBox("Start on login (silent, in tray)")
-            self.autostart_chk.setChecked(is_autostart_enabled())
-            form.addWidget(self.autostart_chk)
             self.hidden_chk = QCheckBox("Start hidden in tray when launched manually")
             self.hidden_chk.setChecked(bool(s.get("start_hidden", False)))
             form.addWidget(self.hidden_chk)
 
-            # ---- Updates
+            # ---- updates
             section("Updates")
             up_row = QHBoxLayout()
             self.update_status = QLabel(f"Current version: v{APP_VERSION}")
+            self.update_status.setFont(app_font(11))
             up_row.addWidget(self.update_status, 1)
             self.check_btn = QPushButton("Check now")
             self.check_btn.setProperty("class", "ghost")
             self.check_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self.check_btn.clicked.connect(self._check_now)
             up_row.addWidget(self.check_btn)
-            self.install_btn = QPushButton("Install update")
+            self.install_btn = QPushButton("Install")
             self.install_btn.setProperty("class", "primary")
             self.install_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self.install_btn.clicked.connect(self._install_now)
@@ -1153,20 +1315,37 @@ if HAS_QT:
             up_row.addWidget(self.install_btn)
             form.addLayout(up_row)
 
-            foot = QLabel(f"Market Sync v{APP_VERSION}  •  Developed by Mahabub H. Aabir")
-            foot.setProperty("class", "muted")
-            foot.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            form.addSpacing(4)
-            form.addWidget(foot)
-            form.addStretch(1)
-
-            # ---- bottom buttons
-            bottom = QHBoxLayout()
+            # ---- footer: logo + version/author + quit
+            foot = QHBoxLayout()
+            foot_logo = QLabel()
+            foot_logo.setFixedSize(18, 18)
+            fpm = QPixmap(18, 18)
+            fpm.fill(Qt.GlobalColor.transparent)
+            lp = os.path.join(ASSETS_DIR, "logo.svg")
+            if HAS_SVG and os.path.exists(lp):
+                r = QSvgRenderer(lp)
+                pp = QPainter(fpm)
+                pp.setRenderHint(QPainter.RenderHint.Antialiasing)
+                r.render(pp)
+                pp.end()
+            foot_logo.setPixmap(fpm)
+            foot.addWidget(foot_logo)
+            foot_info = QLabel(f"Market Sync v{APP_VERSION}  •  {APP_AUTHOR}")
+            foot_info.setFont(app_font(10))
+            foot_info.setStyleSheet(f"color: {self._t['muted']};")
+            foot.addWidget(foot_info)
+            foot.addStretch(1)
             quit_btn = QPushButton("Quit app")
             quit_btn.setProperty("class", "quitbtn")
             quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             quit_btn.clicked.connect(self.c.quit_app)
-            bottom.addWidget(quit_btn)
+            foot.addWidget(quit_btn)
+            form.addSpacing(4)
+            form.addLayout(foot)
+            form.addStretch(1)
+
+            # ---- bottom buttons
+            bottom = QHBoxLayout()
             bottom.addStretch(1)
             cancel_btn = QPushButton("Cancel")
             cancel_btn.setProperty("class", "ghost")
@@ -1184,7 +1363,7 @@ if HAS_QT:
             self._poll.timeout.connect(self._poll_check)
             self._refresh_preview()
 
-        # -- segmented control helper (v0.2 pills)
+        # -- segmented control helper
         def _seg(self, options, current, preview: bool = True):
             w = QWidget()
             h = QHBoxLayout(w)
@@ -1218,17 +1397,11 @@ if HAS_QT:
             t = self._t
             layout_mode = self._seg_value(self.seg_layout, "compact")
             time_as = self._seg_value(self.seg_timeas, "countdown")
-            fmt12 = self._seg_value(self.seg_format, "24h") == "12h"
             sessions = self._seg_value(self.seg_sessions, "active_and_next")
-            icon = self._seg_value(self.seg_icon, "text")
-            if icon == "logo":
-                self.preview.setText(
-                    f'<span style="color:{t["muted"]}">Logo icon + green/gray status dot in the tray</span>')
-                return
             sample = [
-                ("LON", "London", "+02:14", "14:32", True),
-                ("NYC", "New York", "-05:02", "09:02", False),
-                ("SYD", "Sydney", "-12:40", "23:40", False),
+                ("LON", "London", "+04:05", "13:18", True),
+                ("NYC", "New York", "-00:35", "08:18", False),
+                ("SYD", "Sydney", "-57:35", "22:18", False),
             ]
             if sessions == "active_only":
                 shown = sample[:1]
@@ -1240,14 +1413,14 @@ if HAS_QT:
             for sym, full, cd, clock, is_open in shown:
                 name = sym if layout_mode == "compact" else full
                 val = clock if time_as == "local_time" else cd
-                col = GREEN if is_open else t["muted"]
+                col = "#30d158" if is_open else "#cbd5e1"
                 dot = "●" if is_open else "○"
-                parts.append(f'<span style="color:{col};">{dot} {name} {val}</span>')
+                weight = ' font-weight="800"' if is_open else ""
+                parts.append(f'<span style="color:{col};{weight}">{dot} {name} {val}</span>')
             self.preview.setText(
                 "&nbsp;&nbsp;".join(parts)
                 + f'<br><span style="color:{t["muted"]}; font-size:10px;">'
-                + ("12-hour clock &nbsp;•&nbsp; " if fmt12 else "")
-                + "open markets bright, closed dimmed</span>")
+                + "open sessions bright green, closed silvery — exactly like the panel applet</span>")
 
         # -- updates
         def _check_now(self):
@@ -1271,7 +1444,7 @@ if HAS_QT:
             self.check_btn.setEnabled(True)
             res = self._check_result
             if res and res.get("version"):
-                self.update_status.setText(f"Update available: v{res['version']}")
+                self.update_status.setText(f"Update: v{res['version']}")
                 self.install_btn.setVisible(True)
             else:
                 self.update_status.setText(f"Up to date (v{APP_VERSION})")
@@ -1287,7 +1460,7 @@ if HAS_QT:
             s["tray_time_as"] = self._seg_value(self.seg_timeas, "countdown")
             s["time_format"] = self._seg_value(self.seg_format, "24h")
             s["tray_sessions"] = self._seg_value(self.seg_sessions, "active_and_next")
-            s["tray_icon_style"] = self._seg_value(self.seg_icon, "text")
+            s["show_standalone_tray"] = self.standalone_chk.isChecked()
             s["active_brighten"] = self.brighten_chk.isChecked()
             s["market_display"] = {
                 mid: self._seg_value(seg, "panel") for mid, seg in self.route_segs.items()}
@@ -1298,7 +1471,6 @@ if HAS_QT:
             s["news_refresh_minutes"] = self.refresh_cb.currentData()
             s["news_drawer_expanded"] = self.drawer_chk.isChecked()
             s["auto_hide_panel"] = self.autohide_chk.isChecked()
-            s["left_click_action"] = self.leftclick_cb.currentData()
             impacts = [lvl for lvl, chk in self.imp_chks.items() if chk.isChecked()]
             s["active_impacts"] = impacts or ["High", "Medium", "Low"]
             curs = [cur for cur, chk in self.cur_chks.items() if chk.isChecked()]
@@ -1309,7 +1481,7 @@ if HAS_QT:
             self.c._build_menu()
             self.c.panel.apply_theme()
             self.c.panel.rebuild_grid()
-            self.c.panel.drawer.set_expanded(bool(s["news_drawer_expanded"]))
+            self.c.panel.set_drawer_expanded(bool(s["news_drawer_expanded"]))
             self.c.tick()
             self.accept()
 else:
@@ -1328,10 +1500,11 @@ class TrayController:
         self.news_note = "news: …"
         self._news_lock = threading.Lock()
         self._last_tray_key = None
+        self._status_payload: dict = {}
+        self._applet_active = False
         self.statuses = engine.get_all_statuses()
         self.selected = engine.market_status(get_market(settings["selected_market"]))
 
-        # --- auto-update state (must exist before _build_menu reads it)
         self._update_result = _UNSET
         self._update_info: dict | None = None
         self._update_notified_tag: str | None = None
@@ -1352,6 +1525,19 @@ class TrayController:
             self.menu.setStyleSheet(stylesheet(THEMES[th]))
         except Exception:
             pass
+
+        # IPC server so the Cinnamon applet (and --toggle CLI) drives the panel
+        self._ipc = QLocalServer()
+        try:
+            QLocalServer.removeServer(IPC_SOCKET_NAME)
+        except Exception:
+            pass
+        try:
+            self._ipc.listen(IPC_SOCKET_NAME)
+            self._ipc.newConnection.connect(self._on_ipc)
+        except Exception:
+            pass
+
         self.timer = QTimer()
         self.timer.timeout.connect(self.tick)
         self.timer.start(1000)
@@ -1365,8 +1551,63 @@ class TrayController:
         self.update_timer.start(max(1, UPDATE_CHECK_HOURS) * 3600 * 1000)
         QTimer.singleShot(12000, lambda: self._check_updates(force=False))
 
+        # applet detection keeps the both-in-one behaviour honest
+        self.applet_timer = QTimer()
+        self.applet_timer.timeout.connect(self._refresh_tray_visibility)
+        self.applet_timer.start(15000)
+        QTimer.singleShot(1500, self._refresh_tray_visibility)
+
         self.refresh_news(force=True)
         self.tick()
+
+    # ---------------- IPC
+    def _on_ipc(self):
+        while self._ipc.hasPendingConnections():
+            conn = self._ipc.nextPendingConnection()
+            try:
+                if conn.waitForReadyRead(400):
+                    cmd = bytes(conn.readAll()).decode("utf-8", "ignore").strip().lower()
+                    self._handle_ipc_command(cmd)
+            finally:
+                try:
+                    conn.disconnectFromServer()
+                except Exception:
+                    pass
+
+    def _handle_ipc_command(self, cmd: str):
+        if cmd in ("toggle", "--toggle"):
+            self.toggle_panel()
+        elif cmd in ("show", "--show"):
+            if not self.panel.isVisible():
+                self.toggle_panel()
+        elif cmd in ("hide", "--hide"):
+            self.panel.hide()
+        elif cmd in ("preferences", "--preferences"):
+            self.open_preferences()
+        elif cmd in ("quit", "--quit"):
+            self.quit_app()
+
+    # ---------------- applet / tray coordination
+    def _detect_applet(self) -> bool:
+        try:
+            import ast
+            res = subprocess.run(
+                ["gsettings", "get", "org.cinnamon", "enabled-applets"],
+                capture_output=True, text=True, timeout=2)
+            applets = ast.literal_eval(res.stdout.strip())
+            return any(APPLET_UUID in a for a in applets)
+        except Exception:
+            return False
+
+    def _refresh_tray_visibility(self):
+        self._applet_active = self._detect_applet()
+        show = True
+        if self._applet_active and not self.settings.get("show_standalone_tray", True):
+            show = False  # user opted into applet-only
+        try:
+            self.tray.setVisible(show)
+        except Exception:
+            pass
 
     # -- right-click menu
     def _build_menu(self):
@@ -1399,7 +1640,6 @@ class TrayController:
         pref_a.triggered.connect(self.open_preferences)
         self.menu.addAction(pref_a)
 
-        # v0.2 multi-select impact filter
         active = set(self.settings.get("active_impacts", ["High", "Medium", "Low"]))
         filt = self.menu.addMenu("News: impact filter")
         a_all = QAction("🌐 Select all (incl. holidays)", self.menu)
@@ -1419,17 +1659,6 @@ class TrayController:
             a.triggered.connect(lambda _=False, c=cur: self.toggle_currency(c))
             curm.addAction(a)
 
-        disp = self.menu.addMenu("Display in tray")
-        for key, label in (
-            ("show_symbol", "Market symbol"),
-            ("show_countdown", "Countdown timer"),
-            ("show_local_time", "Market local time"),
-            ("show_next_event", "Next event"),
-        ):
-            a = QAction(label, self.menu, checkable=True)
-            a.setChecked(bool(self.settings.get(key, True)))
-            a.triggered.connect(lambda _=False, k=key: self.toggle_display(k))
-            disp.addAction(a)
         theme_m = self.menu.addMenu("Theme")
         tgrp = QActionGroup(self.menu)
         tgrp.setExclusive(True)
@@ -1483,12 +1712,6 @@ class TrayController:
         self._save()
         self.tick()
 
-    def toggle_display(self, key: str):
-        self.settings[key] = not self.settings.get(key, True)
-        self._save()
-        self._build_menu()
-        self.tick()
-
     def set_theme(self, t: str):
         self.settings["theme"] = t
         self._save()
@@ -1509,7 +1732,6 @@ class TrayController:
         self._build_menu()
         self.tick()
 
-    # -- v0.2 impact chips
     def set_active_impacts(self, impacts: list):
         imp = [lvl for lvl in ("High", "Medium", "Low") if lvl in impacts]
         self.settings["active_impacts"] = imp or ["High", "Medium", "Low"]
@@ -1529,7 +1751,7 @@ class TrayController:
         cur = cur.upper()
         lst = list(self.settings.get("currencies", []))
         if cur in lst:
-            if len(lst) > 1:  # keep at least one
+            if len(lst) > 1:
                 lst.remove(cur)
         else:
             lst.append(cur)
@@ -1543,6 +1765,13 @@ class TrayController:
         self._save()
         self._build_menu()
         self.tick()
+
+    def set_drawer_expanded(self, expanded: bool):
+        self.settings["news_drawer_expanded"] = bool(expanded)
+        self._save()
+        self.panel.set_drawer_expanded(bool(expanded))
+        if self.panel.isVisible():
+            self.tick()
 
     def open_preferences(self):
         try:
@@ -1562,7 +1791,6 @@ class TrayController:
             pass
 
     def set_autostart_enabled(self, on: bool):
-        """Toggle login autostart (system entry + Hidden=true user override)."""
         from config import SYSTEM_AUTOSTART_PATH
         try:
             os.makedirs(os.path.dirname(USER_AUTOSTART_PATH), exist_ok=True)
@@ -1612,11 +1840,11 @@ class TrayController:
         with self._news_lock:
             empty = not self.events
         if empty or force:
-            _work()  # synchronous on launch so first paint has data
+            _work()
         else:
             threading.Thread(target=_work, daemon=True).start()
 
-    # ---------------- auto-update plumbing (threads only write state; tick reads)
+    # ---------------- auto-update plumbing
     def _check_updates(self, force: bool = False, announce: bool = False):
         if self._update_busy:
             return
@@ -1694,9 +1922,9 @@ class TrayController:
     def _relaunch(self):
         try:
             if IS_PACKAGED and os.path.exists(LAUNCHER_PATH):
-                cmd = f"sleep 2; SESSION_SYNC_RELAUNCH=1 exec {LAUNCHER_PATH}"
+                cmd = f"sleep 2; MARKET_SYNC_RELAUNCH=1 exec {LAUNCHER_PATH}"
             else:
-                cmd = (f"sleep 2; SESSION_SYNC_RELAUNCH=1 exec /usr/bin/python3 "
+                cmd = (f"sleep 2; MARKET_SYNC_RELAUNCH=1 exec /usr/bin/python3 "
                        f"{os.path.join(app_dir(), 'main.py')}")
             subprocess.Popen(
                 ["setsid", "bash", "-c", cmd],
@@ -1707,9 +1935,8 @@ class TrayController:
             pass
         self.quit_app()
 
-    # ---------------- tray text/icon (v0.2 parity)
+    # ---------------- tray text/icon
     def _multi_segments(self):
-        """Build tray text tokens per v0.2 prefs: layout, time-as, sessions."""
         md = self.settings.get("market_display", {})
         sessions = self.settings.get("tray_sessions", "active_and_next")
         layout_mode = self.settings.get("tray_layout", "compact")
@@ -1725,8 +1952,7 @@ class TrayController:
             if time_as == "local_time":
                 val = engine.format_local_clock(s["now_local"], is_12h)
             else:
-                val = engine.format_signed_countdown(
-                    s["countdown"], s["is_open"]).replace(" ", "")
+                val = engine.format_signed_countdown(s["countdown"], s["is_open"])
             return (f"{name} {val}", bool(s["is_open"]))
 
         opens = [s for s in self.statuses if s["is_open"] and eligible(s)]
@@ -1737,7 +1963,7 @@ class TrayController:
             chosen = opens if opens else closed[:1]
         elif sessions == "active_and_next":
             chosen = opens + closed[:1]
-        else:  # all
+        else:
             chosen = opens + closed
         segs = [token(s) for s in chosen]
         if not segs:
@@ -1760,7 +1986,14 @@ class TrayController:
         nxt = calendar_api.next_event(
             events, self.settings["currencies"], None, now_utc, active_impacts=active)
 
-        # -- tray icon + tooltip
+        # -- Cinnamon applet status file
+        try:
+            self._status_payload = _write_panel_status(
+                self.statuses, self.settings, now_utc, self._status_payload)
+        except Exception:
+            pass
+
+        # -- tray icon
         theme = self.settings.get("theme", "system")
         mode = self.settings.get("tray_mode", "multi")
         style = self.settings.get("tray_icon_style", "text")
@@ -1854,6 +2087,11 @@ class TrayController:
             pass
         try:
             self.news_timer.stop()
+        except Exception:
+            pass
+        try:
+            self._ipc.close()
+            QLocalServer.removeServer(IPC_SOCKET_NAME)
         except Exception:
             pass
         try:

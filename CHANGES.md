@@ -4,6 +4,37 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.4.0 — 2026-09-19 — Design System v2.0 + Cinnamon applet (both-in-one)
+Implements `System_Design/DESIGN_SYSTEM.md` (spec v2.0.0):
+- **Panel shell fixed** — the glass window is now a `QFrame#PanelRoot` inside a
+  transparent host (a bare custom QWidget silently skipped QSS backgrounds,
+  which is why the old renders showed floating cards with no frame)
+- **v2.0 tokens**: rgba window/card/active/hover/divider/input surfaces,
+  slate text scale, spec impact capsules (dark + light variants), new
+  currency palette, Inter font stack with system fallbacks
+- Window: 410px, radius 14, `Tool + Frameless + StaysOnTop`, translucent
+- Cards: 82px, 26px landmark badge, 13px names, 22px signed countdowns,
+  20px progress rings (neon arc when open, faint track when closed)
+- Brand bar (32px): new twin-arc brand logo, MARKET SYNC, drawer toggle,
+  🔔 alerts, ⚙️ preferences, ✕ hide; Up Next drawer with date bar + `▴`
+- **Cinnamon applet** (`market-sync@cinnamon`): live Pango `● LON +04:05`
+  sessions from `panel_status.json`, left-click opens the *same* glass panel,
+  right-click menu (Toggle / Preferences… / Quit), both-in-one tray icon
+- **IPC**: `QLocalServer` (`market_sync_ipc`) + `market-sync --toggle/--show/
+  --hide/--preferences/--quit` (applet drives the running instance)
+- `install-applet.sh` — installs/restores the applet on the Cinnamon panel
+  (and `--remove`), no hardcoded paths
+- Preferences (380px): live top-panel preview, Layout / Show-time-as / Format
+  / Panel Sessions segments, "Show standalone tray icon alongside panel
+  applet" (both-in-one, default on), market routing table, updates, footer
+- **Dependency fix**: added `python3-pyqt6.qtsvg` — apt's python3-pyqt6 does
+  not ship QtSvg, which made landmark badges fall back to letters on fresh
+  installs
+- Fixed `QColor("rgba(..., 0.9)")` float-alpha parsing (rendered black)
+- News cache renamed to `news_events.json` (legacy `calendar.json` still read)
+- New README screenshots incl. applet strip; GitHub repo description/topics
+  refreshed (no stale applet-only metadata)
+
 ### v1.3.2 — 2026-09-19 — v0.2 settings collision fix
 - The retired v0.2 app shared `~/.config/market-sync/settings.json`. Its
   defaults (e.g. NYSE `"none"`, `start_hidden: true`) leaked into the new

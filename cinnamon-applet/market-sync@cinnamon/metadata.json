@@ -1,0 +1,8 @@
+{
+    "uuid": "market-sync@cinnamon",
+    "name": "Market Sync",
+    "description": "Global trading session countdown timers & economic news by Mahabub H. Aabir",
+    "version": "1.4.0",
+    "author": "Mahabub H. Aabir",
+    "max-instances": 1
+}

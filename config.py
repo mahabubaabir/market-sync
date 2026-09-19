@@ -7,22 +7,27 @@ from copy import deepcopy
 
 APP_NAME = "Market Sync"
 APP_ID = "market-sync"
-APP_VERSION = "1.3.2"
+APP_VERSION = "1.4.0"
+APP_AUTHOR = "Mahabub H. Aabir"
+APP_EMAIL = "maha_bub@outlook.com"
 
 # GitHub repo used by the one-line installer + auto-update checker.
-# Change these two lines if you fork / rename the project.
 GITHUB_REPO = "mahabubaabir/market-sync"
 UPDATE_CHECK_HOURS = 24
 
-# Where the app lives when installed from the .deb. Falls back to the source
-# checkout directory when running in development.
+# Where the app lives when installed from the .deb.
 SYSTEM_INSTALL_DIR = "/opt/market-sync"
+LAUNCHER_PATH = "/usr/bin/market-sync"
+
+# IPC socket name (applet <-> app): market-sync --toggle / --preferences / ...
+IPC_SOCKET_NAME = "market_sync_ipc"
+
+# Cinnamon applet uuid (kept for the panel integration)
+APPLET_UUID = "market-sync@cinnamon"
 
 
 def app_dir() -> str:
-    """Directory containing the running application code."""
-    if os.path.exists(os.path.join(SYSTEM_INSTALL_DIR, "main.py")):
-        return SYSTEM_INSTALL_DIR
+    """Directory of the *running* code (dev checkout or /opt install)."""
     return os.path.dirname(os.path.abspath(__file__))
 
 
@@ -106,7 +111,6 @@ ALL_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD"]
 
 DEFAULT_SETTINGS = {
     "selected_market": "LONDON",
-    # "market_local" = hero clock emphasises market tz, "local" = laptop tz.
     "time_mode": "market_local",  # market_local | local
     "currencies": ["USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD"],
     # v0.2-style multi-select impact chips (All = every level ticked).
@@ -119,12 +123,14 @@ DEFAULT_SETTINGS = {
     "time_format": "24h",   # 24h | 12h
     "active_brighten": True,  # brighten open markets, dim closed ones
     "news_drawer_expanded": True,
-    # Tray presentation (v0.2 prefs parity)
-    "tray_mode": "multi",           # multi (old style) | single (selected market)
+    # Tray + top panel presentation (v0.2 parity)
+    "tray_mode": "multi",           # multi (open + next) | single (selected market)
     "tray_icon_style": "text",      # text | logo
     "tray_layout": "compact",       # compact (symbols) | standard (names)
     "tray_time_as": "countdown",    # countdown | local_time
     "tray_sessions": "active_and_next",  # active_only | active_and_next | all
+    # Both-in-one: keep the standalone tray icon while the Cinnamon applet runs.
+    "show_standalone_tray": True,
     # v0.2 per-market routing: none = hide card; popup = panel only; panel = + tray
     "market_display": {
         "LONDON": "panel", "NEW_YORK": "panel", "SYDNEY": "panel",
@@ -135,8 +141,8 @@ DEFAULT_SETTINGS = {
     "show_local_time": True,
     "show_next_event": True,
     "left_click_action": "panel",  # panel | menu
-    "start_hidden": False,         # if True, launch goes to tray only
-    "auto_hide_panel": True,       # hide panel when you click another app
+    "start_hidden": False,
+    "auto_hide_panel": True,
 }
 
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".config", APP_ID)
@@ -144,6 +150,11 @@ SETTINGS_PATH = os.path.join(CONFIG_DIR, "settings.json")
 CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", APP_ID)
 LOCK_PATH = os.path.join(CACHE_DIR, "app.lock")
 LOG_PATH = os.path.join(CACHE_DIR, "app.log")
+# Written every tick for the Cinnamon applet (spec: panel_status.json)
+PANEL_STATUS_PATH = os.path.join(CACHE_DIR, "panel_status.json")
+# Economic calendar cache (spec: news_events.json; legacy: calendar.json)
+NEWS_CACHE_PATH = os.path.join(CACHE_DIR, "news_events.json")
+LEGACY_NEWS_CACHE_PATH = os.path.join(CACHE_DIR, "calendar.json")
 
 # System-wide autostart entry (installed by the .deb, applies to all users).
 SYSTEM_AUTOSTART_PATH = "/etc/xdg/autostart/market-sync.desktop"
@@ -152,10 +163,7 @@ SYSTEM_AUTOSTART_PATH = "/etc/xdg/autostart/market-sync.desktop"
 USER_AUTOSTART_PATH = os.path.join(
     os.path.expanduser("~"), ".config", "autostart", f"{APP_ID}.desktop"
 )
-# Back-compat alias for code that referenced the old name.
 AUTOSTART_PATH = USER_AUTOSTART_PATH
-
-LAUNCHER_PATH = "/usr/bin/market-sync"
 
 
 def get_market(market_id: str) -> dict:
@@ -178,15 +186,6 @@ def _migrate_old_config() -> None:
             dst.write(src.read())
     except Exception:
         pass
-
-
-def _impacts_from_min(min_impact: str) -> list[str]:
-    """Map legacy minimum-impact setting to v0.2 multi-select defaults."""
-    if min_impact == "High":
-        return ["High"]
-    if min_impact == "Medium":
-        return ["Medium", "High"]
-    return ["High", "Medium", "Low"]
 
 
 # Keys written by the retired Market Sync v0.2 app, which used the same
@@ -252,7 +251,6 @@ def load_settings() -> dict:
                 settings["theme"] = "system"
             if settings.get("time_mode") not in ("market_local", "local", "system"):
                 settings["time_mode"] = "market_local"
-            # backward-compat: old "system" time_mode means laptop-local
             if settings.get("time_mode") == "system":
                 settings["time_mode"] = "local"
             if settings.get("time_format") not in ("12h", "24h"):
@@ -265,19 +263,12 @@ def load_settings() -> dict:
                 settings["left_click_action"] = "panel"
             if not isinstance(settings.get("currencies"), list) or not settings["currencies"]:
                 settings["currencies"] = list(DEFAULT_SETTINGS["currencies"])
-            # active_impacts: non-empty subset of High/Medium/Low
             imp = settings.get("active_impacts")
             if not isinstance(imp, list) or not set(imp) <= {"High", "Medium", "Low"} or not imp:
                 settings["active_impacts"] = ["High", "Medium", "Low"]
-            # migration: market_loop (bool) -> market_display (none/popup/panel)
-            if "market_display" not in user and isinstance(user.get("market_loop"), dict):
-                settings["market_display"] = {
-                    mid: ("panel" if user["market_loop"].get(mid, True) else "popup")
-                    for mid in MARKET_IDS
-                }
-            md = settings.get("market_display")
-            if not isinstance(md, dict):
-                md = {}
+            if not isinstance(settings.get("market_display"), dict):
+                settings["market_display"] = {}
+            md = settings.get("market_display") or {}
             settings["market_display"] = {
                 mid: (md.get(mid) if md.get(mid) in ("none", "popup", "panel") else "panel")
                 for mid in MARKET_IDS
@@ -293,6 +284,15 @@ def load_settings() -> dict:
     if adopted:
         save_settings(settings)  # rewrite in the new format
     return settings
+
+
+def _impacts_from_min(min_impact: str) -> list[str]:
+    """Map legacy minimum-impact setting to v0.2 multi-select defaults."""
+    if min_impact == "High":
+        return ["High"]
+    if min_impact == "Medium":
+        return ["Medium", "High"]
+    return ["High", "Medium", "Low"]
 
 
 def autostart_exec_line() -> str:

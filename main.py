@@ -54,6 +54,28 @@ def run_cli(args) -> int:
     return 0
 
 
+def _send_ipc(cmd: str, timeout_ms: int = 500) -> bool:
+    """Send a command to the running Market Sync daemon (applet bridge)."""
+    try:
+        from PyQt6.QtCore import QCoreApplication
+        from PyQt6.QtNetwork import QLocalSocket
+        from config import IPC_SOCKET_NAME
+        app = QCoreApplication.instance()
+        if app is None:
+            app = QCoreApplication(sys.argv[:1])
+        sock = QLocalSocket()
+        sock.connectToServer(IPC_SOCKET_NAME)
+        if not sock.waitForConnected(timeout_ms):
+            return False
+        sock.write((cmd + "\n").encode("utf-8"))
+        sock.flush()
+        sock.waitForBytesWritten(timeout_ms)
+        sock.disconnectFromServer()
+        return True
+    except Exception:
+        return False
+
+
 def _single_instance_or_exit() -> None:
     """Prevent double-launch (two trays = flicker/hang on Cinnamon).
 
@@ -63,7 +85,7 @@ def _single_instance_or_exit() -> None:
     import os
     import time
     from config import LOCK_PATH
-    retries = 8 if os.environ.get("SESSION_SYNC_RELAUNCH") == "1" else 1
+    retries = 8 if os.environ.get("MARKET_SYNC_RELAUNCH") == "1" else 1
     try:
         os.makedirs(os.path.dirname(LOCK_PATH), exist_ok=True)
         import fcntl
@@ -128,6 +150,9 @@ def run_gui(args) -> int:
     hidden_launch = bool(getattr(args, "hidden", False)) or settings.get("start_hidden", False)
     if not hidden_launch:
         ctl.toggle_panel()
+    if getattr(args, "open_prefs", False):
+        from PyQt6.QtCore import QTimer as _QT
+        _QT.singleShot(600, ctl.open_preferences)
     return app.exec()
 
 
@@ -141,6 +166,12 @@ def main() -> int:
     ap.add_argument("--hidden", action="store_true", help="start hidden in tray (for autostart/background)")
     ap.add_argument("--check-update", action="store_true", help="check GitHub for a newer release and exit")
     ap.add_argument("--version", action="store_true", help="print version")
+    # IPC commands (used by the Cinnamon applet and panel buttons)
+    ap.add_argument("--toggle", action="store_true", help="toggle the glass panel (IPC)")
+    ap.add_argument("--show", action="store_true", help="show the glass panel (IPC)")
+    ap.add_argument("--hide", action="store_true", help="hide the glass panel (IPC)")
+    ap.add_argument("--preferences", action="store_true", help="open Preferences (IPC)")
+    ap.add_argument("--quit", action="store_true", help="quit the background daemon (IPC)")
     args = ap.parse_args()
     if args.version:
         print(f"{APP_NAME} {APP_VERSION}")
@@ -157,6 +188,19 @@ def main() -> int:
         else:
             print(f"Up to date (v{APP_VERSION}).")
         return 0
+    if args.toggle or args.show or args.hide or args.preferences or args.quit:
+        cmd = ("toggle" if args.toggle else
+               "show" if args.show else
+               "hide" if args.hide else
+               "preferences" if args.preferences else "quit")
+        if _send_ipc(cmd):
+            return 0
+        # No daemon running: quit is a no-op; other commands launch the app.
+        if cmd == "quit":
+            return 0
+        args.hidden = False
+        args.open_prefs = (cmd == "preferences")
+        return run_gui(args)
     if args.cli or args.once:
         return run_cli(args)
     return run_gui(args)
