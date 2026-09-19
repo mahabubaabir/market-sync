@@ -82,7 +82,7 @@ Collapsed (dark) and Preferences (Design System v2.0):
 | Crash-resilient | Auto-hide panel, single instance, restart-on-crash launcher, cached tray icon |
 
 The full design specification lives in
-[`System_Design/DESIGN_SYSTEM.md`](System_Design/DESIGN_SYSTEM.md) (tokens,
+[`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) (tokens,
 typography, components, applet + IPC specs).
 
 ## Tray interactions
