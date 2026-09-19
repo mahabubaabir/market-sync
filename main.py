@@ -37,7 +37,8 @@ def run_cli(args) -> int:
                 dot = "🟢" if s["is_open"] else "⚪"
                 lines.append(f"{mark} {dot} {s['market']['symbol']:5s} {s['market']['name']:14s} "
                              f"{'OPEN ' if s['is_open'] else 'SHUT '} {s['next_label']:6s} {engine.format_countdown(s['countdown'])}")
-            nxt = calendar_api.next_event(events, settings["currencies"], settings["min_impact"], now)
+            nxt = calendar_api.next_event(events, settings["currencies"], settings["min_impact"], now,
+                                          settings.get("active_impacts"))
             print("\033c", end="")
             print(f"{APP_NAME} — {sel['market']['name']} {'OPEN' if sel['is_open'] else 'CLOSED'} "
                   f"{sel['next_label']} in {engine.format_countdown(sel['countdown'])}")

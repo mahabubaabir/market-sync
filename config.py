@@ -7,7 +7,7 @@ from copy import deepcopy
 
 APP_NAME = "Market Sync"
 APP_ID = "market-sync"
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 
 # GitHub repo used by the one-line installer + auto-update checker.
 # Change these two lines if you fork / rename the project.
@@ -28,16 +28,41 @@ def app_dir() -> str:
 
 IS_PACKAGED = os.path.exists(os.path.join(SYSTEM_INSTALL_DIR, "main.py"))
 
-# Local open/close times. Chosen to match the reference app's UTC windows
-# (Sydney 21-06 UTC, Tokyo 00-09 UTC, London 07-16 UTC, NY 12-21 UTC,
-#  NYSE 13:30-20 UTC) but expressed in market-local time so DST is correct.
+# Market order matches Market Sync v0.2: London, New York, Sydney, Tokyo, NYSE.
+# Open/close times are stored market-local so DST is always correct.
 MARKETS = [
+    {
+        "id": "LONDON",
+        "name": "London",
+        "symbol": "LON",
+        "flag": "🇬🇧",
+        "landmark": "london",
+        "tz": "Europe/London",
+        "open": "08:00",
+        "close": "16:30",
+        "type": "fx",
+        "utc_hint": "07:00–16:00 UTC",
+        "color": "#8ecd76",
+    },
+    {
+        "id": "NEW_YORK",
+        "name": "New York",
+        "symbol": "NYC",
+        "flag": "🇺🇸",
+        "landmark": "new_york",
+        "tz": "America/New_York",
+        "open": "08:00",
+        "close": "17:00",
+        "type": "fx",
+        "utc_hint": "12:00–21:00 UTC",
+        "color": "#c792ea",
+    },
     {
         "id": "SYDNEY",
         "name": "Sydney",
         "symbol": "SYD",
-        "landmark": "sydney",
         "flag": "🇦🇺",
+        "landmark": "sydney",
         "tz": "Australia/Sydney",
         "open": "07:00",
         "close": "16:00",
@@ -49,8 +74,8 @@ MARKETS = [
         "id": "TOKYO",
         "name": "Tokyo",
         "symbol": "TYO",
-        "landmark": "tokyo",
         "flag": "🇯🇵",
+        "landmark": "tokyo",
         "tz": "Asia/Tokyo",
         "open": "09:00",
         "close": "18:00",
@@ -59,37 +84,11 @@ MARKETS = [
         "color": "#ff6b6b",
     },
     {
-        "id": "LONDON",
-        "name": "London",
-        "symbol": "LON",
-        "landmark": "london",
-        "flag": "🇬🇧",
-        "tz": "Europe/London",
-        "open": "08:00",
-        "close": "16:30",
-        "type": "fx",
-        "utc_hint": "07:00–16:00 UTC",
-        "color": "#8ecd76",
-    },
-    {
-        "id": "NEW_YORK",
-        "name": "New York (FX)",
-        "symbol": "NYC",
-        "landmark": "new_york",
-        "flag": "🇺🇸",
-        "tz": "America/New_York",
-        "open": "08:00",
-        "close": "17:00",
-        "type": "fx",
-        "utc_hint": "12:00–21:00 UTC",
-        "color": "#c792ea",
-    },
-    {
         "id": "NYSE",
         "name": "NYSE",
         "symbol": "NYSE",
-        "landmark": "new_york",
         "flag": "🗽",
+        "landmark": "new_york",
         "tz": "America/New_York",
         "open": "09:30",
         "close": "16:00",
@@ -107,15 +106,25 @@ ALL_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD"]
 
 DEFAULT_SETTINGS = {
     "selected_market": "LONDON",
-    # "market_local" = hero clock emphasises market tz, "local" = emphasises laptop tz.
-    # Both times are ALWAYS shown; this only flips which one is on top.
+    # "market_local" = hero clock emphasises market tz, "local" = laptop tz.
     "time_mode": "market_local",  # market_local | local
     "currencies": ["USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD"],
-    "min_impact": "All",  # All | Low | Medium | High  (All includes holidays)
+    # v0.2-style multi-select impact chips (All = every level ticked).
+    "active_impacts": ["High", "Medium", "Low"],
+    "min_impact": "All",  # legacy fallback kept for compatibility
     "alerts_enabled": True,
     "alert_minutes_before": 5,
     "news_refresh_minutes": 15,
     "theme": "system",  # system | light | dark | dark_purple | mint_light | mint_dark
+    "time_format": "24h",   # 24h | 12h
+    "active_brighten": True,  # brighten open markets, dim closed ones
+    "news_drawer_expanded": True,
+    # Tray presentation (v0.2 applet parity)
+    "tray_mode": "multi",           # multi (open + next) | single (selected market)
+    "tray_icon_style": "text",      # text | logo
+    "market_loop": {                # which markets appear in multi tray text
+        "LONDON": True, "NEW_YORK": True, "SYDNEY": True, "TOKYO": True, "NYSE": True,
+    },
     "show_symbol": True,
     "show_countdown": True,
     "show_local_time": True,
@@ -148,7 +157,7 @@ def get_market(market_id: str) -> dict:
     for m in MARKETS:
         if m["id"] == market_id:
             return m
-    return MARKETS[2]
+    return MARKETS[0]
 
 
 def _migrate_old_config() -> None:
@@ -166,6 +175,15 @@ def _migrate_old_config() -> None:
         pass
 
 
+def _impacts_from_min(min_impact: str) -> list[str]:
+    """Map legacy minimum-impact setting to v0.2 multi-select defaults."""
+    if min_impact == "High":
+        return ["High"]
+    if min_impact == "Medium":
+        return ["Medium", "High"]
+    return ["High", "Medium", "Low"]
+
+
 def load_settings() -> dict:
     _migrate_old_config()
     settings = deepcopy(DEFAULT_SETTINGS)
@@ -176,10 +194,11 @@ def load_settings() -> dict:
             for k, v in user.items():
                 if k in DEFAULT_SETTINGS:
                     settings[k] = v
+            # migration: old min_impact -> active_impacts (only if unticked)
+            if "active_impacts" not in user and user.get("min_impact"):
+                settings["active_impacts"] = _impacts_from_min(user["min_impact"])
             if settings["selected_market"] not in MARKET_IDS:
                 settings["selected_market"] = "LONDON"
-            if settings.get("min_impact") not in ("All", "Low", "Medium", "High"):
-                settings["min_impact"] = "All"
             if settings.get("theme") not in (
                 "system", "light", "dark", "dark_purple", "mint_light", "mint_dark"
             ):
@@ -189,10 +208,25 @@ def load_settings() -> dict:
             # backward-compat: old "system" time_mode means laptop-local
             if settings.get("time_mode") == "system":
                 settings["time_mode"] = "local"
+            if settings.get("time_format") not in ("12h", "24h"):
+                settings["time_format"] = "24h"
+            if settings.get("tray_mode") not in ("multi", "single"):
+                settings["tray_mode"] = "multi"
+            if settings.get("tray_icon_style") not in ("text", "logo"):
+                settings["tray_icon_style"] = "text"
             if settings.get("left_click_action") not in ("panel", "menu"):
                 settings["left_click_action"] = "panel"
             if not isinstance(settings.get("currencies"), list) or not settings["currencies"]:
                 settings["currencies"] = list(DEFAULT_SETTINGS["currencies"])
+            # active_impacts: non-empty subset of High/Medium/Low
+            imp = settings.get("active_impacts")
+            if not isinstance(imp, list) or not set(imp) <= {"High", "Medium", "Low"} or not imp:
+                settings["active_impacts"] = ["High", "Medium", "Low"]
+            # market_loop: keep known ids only, default True
+            loop = settings.get("market_loop")
+            if not isinstance(loop, dict):
+                loop = {}
+            settings["market_loop"] = {mid: bool(loop.get(mid, True)) for mid in MARKET_IDS}
     except Exception:
         pass
     return settings

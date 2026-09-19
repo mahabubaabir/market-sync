@@ -48,41 +48,46 @@ python3 main.py --cli --news          # text mode, no Qt needed
 
 ## Screenshots
 
-| Dark glass | Light glass | Mint dark | Dark purple |
-|---|---|---|---|
-| ![dark](docs/screenshots/panel-dark.png) | ![light](docs/screenshots/panel-light.png) | ![mint](docs/screenshots/panel-mint_dark.png) | ![purple](docs/screenshots/panel-dark_purple.png) |
+| Collapsed (dark) | Expanded (dark) | Light | Mint dark | Dark purple |
+|---|---|---|---|---|
+| ![collapsed](docs/screenshots/panel-dark-collapsed.png) | ![dark](docs/screenshots/panel-dark.png) | ![light](docs/screenshots/panel-light.png) | ![mint](docs/screenshots/panel-mint_dark.png) | ![purple](docs/screenshots/panel-dark_purple.png) |
 
-Material-glass design: frosted translucent cards, landmark vector badges
-(London Eye, Statue of Liberty, Sydney Opera House, Torii Gate), signed
-countdowns (`+ 05:18` open / `- 23:42` closed), active sessions glowing
-neon green while closed ones dim to slate, and impact chips
-[All] [🟡 Low] [🟠 Med] [🔴 High].
+Faithful to **Market Sync v0.2**: a 2-column grid of frosted glass market
+cards with landmark vector badges (London Eye, Statue of Liberty, Sydney
+Opera House, Torii Gate), signed countdowns (`+ 05:18` open / `- 23:42`
+closed), OPEN/CLOSED pills and mini progress rings; a brand bar with alerts
+bell and preferences; and a collapsible **Up Next** drawer with
+`[All] [🔴 High] [🟠 Med] [🟡 Low]` multi-select chips, relative event times
+and impact/currency pills.
 
 ## Features
 
 | Feature | Notes |
 |---|---|
-| 5 markets, DST-correct | Sydney, Tokyo, London, New York FX, NYSE — IANA timezones, not hardcoded UTC |
+| 5 markets, DST-correct | London, New York, Sydney, Tokyo, NYSE — IANA timezones, not hardcoded UTC |
 | Glass design (v0.2) | Frosted translucent panel + cards, landmark badges, no heavy blur effects — smooth on Cinnamon |
-| Market cards | Clickable glass cards with signed countdowns, OPEN/CLOSED pills, mini progress rings |
-| Active-session brightening | Open sessions glow neon green; closed ones dim to muted slate |
-| Live countdown | 1-second tray countdown (`LON +02:14:33`) to the next open/close |
-| Market vs local clock | Both always shown, labelled; one tap to flip emphasis |
+| Market cards grid | Clickable 2-column glass cards: signed countdowns, OPEN/CLOSED pills, mini progress rings |
+| Active-session brightening | Open sessions glow neon green; closed ones dim to muted slate (toggleable) |
+| Up Next drawer | Collapsible v0.2 news drawer: relative times, impact pills, colored currency pills, date bar |
+| Timeline clock | Market-local clocks on every card; your laptop clock in the drawer's date bar |
+| Tray text | Old style: `● LON +02:14  ○ NYC -05:02` (open + next, bright/dim) or single market |
+| Tray icon | Text countdown or the v0.2 logo + status dot |
+| Impact chips | `[All] [🔴 High] [🟠 Med] [🟡 Low]` multi-select + currency filter (8 majors); holidays under All |
 | Economic calendar | ForexFactory feed, no API key, cached offline |
-| Impact chips | [All] [🟡 Low] [🟠 Med] [🔴 High] minimum filter + currency filter (8 majors); All includes holidays |
-| “Next event” in tray | `• USD 45m` style badge, plus tooltip |
-| Alerts | Open/close pre-alert + high-impact news notifications |
+| Alerts | Open/close pre-alert + high-impact news notifications; 🔔 toggle in the panel |
 | Holiday aware | NYSE holidays + early closes computed locally, no pandas |
 | 6 themes | System, Light, Dark, Dark Purple, Mint Light, Mint Dark — all in glass |
+| Preferences window | v0.2-style dialog: appearance, 12/24h clock, markets, news, startup, updates, quit |
 | One-click updates | Notifies on new GitHub release, installs with a password prompt |
 | Crash-resilient | Auto-hide panel, single instance, restart-on-crash launcher, cached tray icon |
 
 ## Tray interactions
 
 ```
-Left-click  → panel (Hide ✕ / Quit app buttons at the bottom)
-Right-click → markets • news filter • display toggles • themes •
-              left-click behaviour • startup options • check updates • quit
+Left-click  → panel (grid of market cards + Up Next drawer; ✕ hides it)
+Right-click → markets • Preferences… • impact filter • currencies •
+              display toggles • themes • left-click behaviour •
+              startup • check updates • quit
 ```
 
 ## Auto-updates

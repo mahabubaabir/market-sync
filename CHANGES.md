@@ -4,6 +4,32 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.3.0 — 2026-09-19 — full v0.2 layout parity
+Structure now matches Market Sync v0.2, not just the skin:
+- **Panel**: market card grid (2 columns, 88px v0.2 cards with landmark,
+  full name, market-local clock, signed countdown, pill, mini ring) →
+  brand bar → collapsible **Up Next drawer**. The big hero banner is gone.
+- **Brand bar**: logo + MARKET SYNC + 🌙 theme + 🔔 alerts toggle +
+  ⚙️ Preferences + ✕ hide
+- **Up Next drawer**: 34px trigger bar ("12m To next event (🔴 USD …) ∧"),
+  expands to chips + news rows + date bar "18 Sep • 💻 14:32" with collapse
+  control; laptop clock lives in the date bar
+- **News rows**: relative time (12m / 5h 42m / 2d 3h), impact pill
+  (HIG/MED/LOW, v0.2 red/orange/yellow), colored currency pill, title
+- **Impact chips are multi-select** like v0.2: [All] [🔴 High] [🟠 Med]
+  [🟡 Low]; holidays appear when all three are ticked
+- **Tray**: multi-market text `● LON +02:14  ○ NYC -05:02` (open + next,
+  bright/dim, per-market loop toggles) or single-market mode; icon style
+  text or v0.2 logo + status dot
+- **Preferences window** (460×620): appearance, 12/24h clock, tray options,
+  markets & loop, news impacts/currencies/refresh, behaviour, startup,
+  updates (check + install), quit
+- **Market order/name**: London, New York, Sydney, Tokyo, NYSE; "New York"
+- Settings migrations: `min_impact` → `active_impacts`; new keys validated
+- Panel sizes: 410×364 collapsed / 410×536 expanded (fits 768p)
+- Kept stability features: auto-hide on focus loss, ✕ close, silent login
+  start, one-click updates, single instance, crash-restart launcher
+
 ### v1.2.0 — 2026-09-19 — v0.2 glass design port
 The standalone app now wears the original Market Sync v0.2 design language:
 - **Glassmorphism**: translucent frosted panel + cards (pure rgba translucency —

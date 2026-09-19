@@ -222,9 +222,11 @@ def format_signed_countdown(td: timedelta, is_open: bool, include_seconds: bool 
     return f"{sign} {h:02d}:{m:02d}"
 
 
-def format_clock(dt: datetime, time_mode: str = "market_local") -> str:
-    # time_mode handled by caller for system tz; here just HH:MM:SS
-    return dt.strftime("%H:%M:%S")
+def format_local_clock(dt: datetime, is_12h: bool = False) -> str:
+    """Market Sync card clock: '14:32' (24h) or '2:32 PM' (12h)."""
+    if is_12h:
+        return dt.strftime("%I:%M %p").lstrip("0")
+    return dt.strftime("%H:%M")
 
 
 def overlap_count(statuses: list[dict] | None = None) -> int:
