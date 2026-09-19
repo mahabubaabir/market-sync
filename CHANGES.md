@@ -4,6 +4,17 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.3.2 — 2026-09-19 — v0.2 settings collision fix
+- The retired v0.2 app shared `~/.config/market-sync/settings.json`. Its
+  defaults (e.g. NYSE `"none"`, `start_hidden: true`) leaked into the new
+  app and could hide market cards. Now detected, translated and backed up:
+  - `"+ menu bar"` → `panel`, `"none"` → `popup` (card shows, tray loop off)
+  - `menu_layout` → `tray_layout`, `show_time_as` → `tray_time_as`,
+    `panel_session_filter` → `tray_sessions`
+  - `start_hidden` reset (never inherit silent start from the old app)
+  - old-only keys dropped; original file kept as `settings.json.v0.2-backup`
+- The cleaned settings are rewritten in the new format on first load
+
 ### v1.3.1 — 2026-09-19 — v0.2 Preferences dialog
 - Rebuilt ⚙️ Preferences to mirror the old v0.2 window:
   - **Live tray preview** strip (updates as you change options)

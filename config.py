@@ -7,7 +7,7 @@ from copy import deepcopy
 
 APP_NAME = "Market Sync"
 APP_ID = "market-sync"
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.3.2"
 
 # GitHub repo used by the one-line installer + auto-update checker.
 # Change these two lines if you fork / rename the project.
@@ -189,9 +189,50 @@ def _impacts_from_min(min_impact: str) -> list[str]:
     return ["High", "Medium", "Low"]
 
 
+# Keys written by the retired Market Sync v0.2 app, which used the same
+# settings path (~/.config/market-sync/settings.json). We translate them
+# instead of trusting them, so v0.2 defaults like NYSE "none" cannot hide
+# cards in the new app.
+_OLD_V02_KEYS = ("menu_layout", "show_time_as", "panel_session_filter",
+                 "show_system_tray", "glass_blur", "market_order", "launch_at_login")
+_OLD_MARKET_DISPLAY = {"+ menu bar": "panel", "panel": "panel",
+                       "popup": "popup", "none": "popup"}
+
+
+def _adopt_old_v02(settings: dict, user: dict) -> bool:
+    """Translate a v0.2 settings file into our format. Returns True if it
+    looked like v0.2 (and makes a backup next to it)."""
+    if not any(k in user for k in _OLD_V02_KEYS):
+        return False
+    try:
+        import shutil
+        shutil.copyfile(SETTINGS_PATH, SETTINGS_PATH + ".v0.2-backup")
+    except Exception:
+        pass
+    md = user.get("market_display")
+    if isinstance(md, dict):
+        settings["market_display"] = {
+            mid: _OLD_MARKET_DISPLAY.get(str(md.get(mid, "")), "panel")
+            for mid in MARKET_IDS
+        }
+    for new_key, old_key, valid in (
+        ("tray_layout", "menu_layout", ("compact", "standard")),
+        ("tray_time_as", "show_time_as", ("countdown", "local_time")),
+        ("tray_sessions", "panel_session_filter",
+         ("active_only", "active_and_next", "all")),
+    ):
+        val = user.get(old_key)
+        if val in valid:
+            settings[new_key] = val
+    # never inherit a silent start from the old app
+    settings["start_hidden"] = False
+    return True
+
+
 def load_settings() -> dict:
     _migrate_old_config()
     settings = deepcopy(DEFAULT_SETTINGS)
+    adopted = False
     try:
         if os.path.exists(SETTINGS_PATH):
             with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
@@ -199,6 +240,7 @@ def load_settings() -> dict:
             for k, v in user.items():
                 if k in DEFAULT_SETTINGS:
                     settings[k] = v
+            adopted = _adopt_old_v02(settings, user)
             # migration: old min_impact -> active_impacts (only if unticked)
             if "active_impacts" not in user and user.get("min_impact"):
                 settings["active_impacts"] = _impacts_from_min(user["min_impact"])
@@ -248,6 +290,8 @@ def load_settings() -> dict:
                 settings["tray_sessions"] = "active_and_next"
     except Exception:
         pass
+    if adopted:
+        save_settings(settings)  # rewrite in the new format
     return settings
 
 
