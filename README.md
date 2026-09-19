@@ -52,6 +52,10 @@ python3 main.py --cli --news          # text mode, no Qt needed
 |---|---|---|---|---|
 | ![collapsed](docs/screenshots/panel-dark-collapsed.png) | ![dark](docs/screenshots/panel-dark.png) | ![light](docs/screenshots/panel-light.png) | ![mint](docs/screenshots/panel-mint_dark.png) | ![purple](docs/screenshots/panel-dark_purple.png) |
 
+Preferences (v0.2 layout with live tray preview and per-market routing):
+
+![preferences](docs/screenshots/preferences.png)
+
 Faithful to **Market Sync v0.2**: a 2-column grid of frosted glass market
 cards with landmark vector badges (London Eye, Statue of Liberty, Sydney
 Opera House, Torii Gate), signed countdowns (`+ 05:18` open / `- 23:42`
@@ -77,7 +81,8 @@ and impact/currency pills.
 | Alerts | Open/close pre-alert + high-impact news notifications; 🔔 toggle in the panel |
 | Holiday aware | NYSE holidays + early closes computed locally, no pandas |
 | 6 themes | System, Light, Dark, Dark Purple, Mint Light, Mint Dark — all in glass |
-| Preferences window | v0.2-style dialog: appearance, 12/24h clock, markets, news, startup, updates, quit |
+| Preferences window | v0.2 layout: segmented Layout / Show-time-as / Format / Sessions controls, **live tray preview**, per-market **None / Popup / + Tray** routing, news, startup, updates, quit |
+| Market routing | Hide any market's card (`None`), panel-only (`Popup`), or also in the tray loop (`+ Tray`) |
 | One-click updates | Notifies on new GitHub release, installs with a password prompt |
 | Crash-resilient | Auto-hide panel, single instance, restart-on-crash launcher, cached tray icon |
 

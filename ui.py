@@ -17,7 +17,7 @@ try:
     from PyQt6.QtWidgets import (
         QApplication, QWidget, QSystemTrayIcon, QMenu,
         QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea,
-        QFrame, QCheckBox, QGridLayout, QDialog, QComboBox,
+        QFrame, QCheckBox, QGridLayout, QDialog, QComboBox, QButtonGroup,
     )
     from PyQt6.QtGui import (
         QIcon, QPixmap, QPainter, QColor, QFont, QAction, QActionGroup,
@@ -233,6 +233,8 @@ QScrollArea > QWidget {{ background: transparent; }}
 QScrollArea > QWidget > QWidget {{ background: transparent; }}
 QMenu {{ background: {t['card']}; color: {t['text']}; border: 1px solid {t['border']}; }}
 QDialog {{ background: {t['solid_bg']}; }}
+QPushButton[seg="1"] {{ background: transparent; color: {t['muted']}; border: 1px solid {t['border']}; border-radius: 8px; padding: 3px 10px; font-size: 11px; font-weight: 700; }}
+QPushButton[seg="1"]:checked {{ background: {t['tint']}; border-color: {t['accent']}; color: {t['text']}; }}
 QComboBox {{ background: {t['card']}; color: {t['text']}; border: 1px solid {t['border']}; border-radius: 6px; padding: 3px 10px; min-width: 110px; }}
 QComboBox::drop-down {{ border: none; width: 18px; }}
 QComboBox QAbstractItemView {{ background: {t['card']}; color: {t['text']}; selection-background-color: {t['accent']}; }}
@@ -815,21 +817,17 @@ class SessionPanel(QWidget):
 
         # ---- 1. market cards grid (v0.2 order & look)
         self.cards: dict[str, MarketCardWidget] = {}
-        grid = QGridLayout()
-        grid.setContentsMargins(0, 0, 0, 0)
-        grid.setSpacing(7)
-        grid.setColumnStretch(0, 1)
-        grid.setColumnStretch(1, 1)
-        for idx, m in enumerate(MARKETS):
+        self.grid = QGridLayout()
+        self.grid.setContentsMargins(0, 0, 0, 0)
+        self.grid.setSpacing(7)
+        self.grid.setColumnStretch(0, 1)
+        self.grid.setColumnStretch(1, 1)
+        for m in MARKETS:
             card = MarketCardWidget(m)
             card.clicked.connect(self.c.select_market)
             self.cards[m["id"]] = card
-            r, col = divmod(idx, 2)
-            if idx == len(MARKETS) - 1 and len(MARKETS) % 2 == 1:
-                grid.addWidget(card, r, 0, 1, 2)  # last card spans full width
-            else:
-                grid.addWidget(card, r, col)
-        root.addLayout(grid)
+        root.addLayout(self.grid)
+        self.rebuild_grid()
 
         # ---- 2. brand bar: logo + title + theme/alerts/preferences/close
         brand = QHBoxLayout()
@@ -885,6 +883,23 @@ class SessionPanel(QWidget):
         root.addWidget(self.drawer)
 
         self.apply_theme()
+
+    def rebuild_grid(self):
+        """v0.2 market routing: 'none' hides the card, others show it."""
+        md = self.c.settings.get("market_display", {})
+        enabled = [m for m in MARKETS if md.get(m["id"], "panel") != "none"]
+        while self.grid.count():
+            self.grid.takeAt(0)
+        for m in MARKETS:
+            self.cards[m["id"]].hide()
+        for idx, m in enumerate(enabled):
+            card = self.cards[m["id"]]
+            card.show()
+            r, col = divmod(idx, 2)
+            if idx == len(enabled) - 1 and len(enabled) % 2 == 1:
+                self.grid.addWidget(card, r, 0, 1, 2)  # last card spans full width
+            else:
+                self.grid.addWidget(card, r, col)
 
     # Panel must NOT stick over other apps: hide when it loses focus
     def changeEvent(self, ev):
@@ -964,17 +979,19 @@ class SessionPanel(QWidget):
 
 if HAS_QT:
     class PreferencesDialog(QDialog):
-        """v0.2-style preferences: Appearance / Time / Markets / News /
-        Startup / Updates, with a Quit button."""
+        """v0.2-style preferences: segmented display controls, live tray
+        preview, per-market routing (none / popup / tray), news, startup,
+        updates and a Quit button."""
 
         def __init__(self, controller: "TrayController"):
             super().__init__()
             self.c = controller
             s = controller.settings
             self._check_result = _UNSET
+            self._t = THEMES[resolve_theme(s.get("theme", "system"))]
             self.setWindowTitle(f"{APP_NAME} — Preferences")
             self.setFixedSize(460, 620)
-            self.setStyleSheet(stylesheet(THEMES[resolve_theme(s.get("theme", "system"))]))
+            self.setStyleSheet(stylesheet(self._t))
 
             root = QVBoxLayout(self)
             root.setContentsMargins(14, 12, 14, 12)
@@ -997,96 +1014,108 @@ if HAS_QT:
             def row(label, widget):
                 h = QHBoxLayout()
                 lab = QLabel(label)
-                lab.setFixedWidth(150)
+                lab.setFixedWidth(110)
                 h.addWidget(lab)
                 h.addWidget(widget)
                 h.addStretch(1)
                 form.addLayout(h)
 
-            # ---- Appearance
-            section("Appearance")
-            self.theme_cb = QComboBox()
-            for key in THEME_ORDER:
-                self.theme_cb.addItem(f"{THEME_ICON[key]}  {THEME_LABELS[key]}", key)
-            self.theme_cb.setCurrentIndex(THEME_ORDER.index(s.get("theme", "system")))
-            row("Theme", self.theme_cb)
-            self.brighten_chk = QCheckBox("Brighten open sessions, dim closed")
+            # ---- live tray preview
+            self.preview = QLabel("")
+            self.preview.setWordWrap(True)
+            self.preview.setStyleSheet(
+                f"background: {self._t['tint']}; border: 1px solid {self._t['border']};"
+                "border-radius: 10px; padding: 8px 10px; font-size: 12px;")
+            form.addWidget(self.preview)
+
+            # ---- Menu & Tray Display (v0.2 segmented controls)
+            section("Menu & Tray Display")
+            self.seg_layout = self._seg(
+                [("compact", "Compact Symbols"), ("standard", "Standard Names")],
+                s.get("tray_layout", "compact"))
+            row("Layout", self.seg_layout)
+            self.seg_timeas = self._seg(
+                [("local_time", "Local Time"), ("countdown", "Countdown")],
+                s.get("tray_time_as", "countdown"))
+            row("Show time as", self.seg_timeas)
+            self.seg_format = self._seg(
+                [("12h", "12h"), ("24h", "24h")], s.get("time_format", "24h"))
+            row("Format", self.seg_format)
+            self.seg_sessions = self._seg(
+                [("active_only", "Active Only"), ("active_and_next", "Active + Next"),
+                 ("all", "All")], s.get("tray_sessions", "active_and_next"))
+            row("Tray sessions", self.seg_sessions)
+            self.seg_icon = self._seg(
+                [("text", "Text"), ("logo", "Logo + dot")],
+                s.get("tray_icon_style", "text"))
+            row("Tray icon", self.seg_icon)
+            self.brighten_chk = QCheckBox("Active markets brighten; off sessions are dimmed")
             self.brighten_chk.setChecked(bool(s.get("active_brighten", True)))
+            self.brighten_chk.toggled.connect(self._refresh_preview)
             form.addWidget(self.brighten_chk)
-            self.icon_cb = QComboBox()
-            self.icon_cb.addItem("Text (LON +02:14)", "text")
-            self.icon_cb.addItem("Logo + status dot", "logo")
-            self.icon_cb.setCurrentIndex(0 if s.get("tray_icon_style", "text") == "text" else 1)
-            row("Tray icon", self.icon_cb)
 
-            # ---- Time & tray
-            section("Time & tray")
-            self.fmt_cb = QComboBox()
-            self.fmt_cb.addItem("24-hour", "24h")
-            self.fmt_cb.addItem("12-hour (AM/PM)", "12h")
-            self.fmt_cb.setCurrentIndex(0 if s.get("time_format", "24h") == "24h" else 1)
-            row("Clock format", self.fmt_cb)
-            self.traymode_cb = QComboBox()
-            self.traymode_cb.addItem("Open + next markets (old style)", "multi")
-            self.traymode_cb.addItem("Selected market only", "single")
-            self.traymode_cb.setCurrentIndex(0 if s.get("tray_mode", "multi") == "multi" else 1)
-            row("Tray text", self.traymode_cb)
-            self.disp_chks: dict[str, QCheckBox] = {}
-            for key, label in (
-                ("show_symbol", "Market symbol"),
-                ("show_countdown", "Countdown timer"),
-                ("show_local_time", "Market local time"),
-                ("show_next_event", "Next event"),
-            ):
-                chk = QCheckBox(label)
-                chk.setChecked(bool(s.get(key, True)))
-                self.disp_chks[key] = chk
-                form.addWidget(chk)
-
-            # ---- Markets
-            section("Markets")
-            self.sel_cb = QComboBox()
+            # ---- Market List (v0.2 routing: none / popup / tray)
+            section("Market List")
+            self.route_segs: dict = {}
+            md = s.get("market_display", {})
             for m in MARKETS:
-                self.sel_cb.addItem(f"{m['flag']}  {m['name']}", m["id"])
-            self.sel_cb.setCurrentIndex(MARKET_IDS.index(s.get("selected_market", "LONDON")))
-            row("Default market", self.sel_cb)
-            self.loop_chks: dict[str, QCheckBox] = {}
-            loop = s.get("market_loop", {})
-            for m in MARKETS:
-                chk = QCheckBox(f"{m['name']} — show in tray loop")
-                chk.setChecked(bool(loop.get(m["id"], True)))
-                self.loop_chks[m["id"]] = chk
-                form.addWidget(chk)
+                h = QHBoxLayout()
+                lab = QLabel(f"{m['name']} ({m['symbol']})")
+                lab.setFixedWidth(150)
+                h.addWidget(lab)
+                seg = self._seg(
+                    [("none", "None"), ("popup", "Popup"), ("panel", "+ Tray")],
+                    md.get(m["id"], "panel"), preview=False)
+                h.addWidget(seg)
+                h.addStretch(1)
+                form.addLayout(h)
+                self.route_segs[m["id"]] = seg
 
             # ---- News
             section("News")
-            self.imp_chks: dict[str, QCheckBox] = {}
             active = set(s.get("active_impacts", ["High", "Medium", "Low"]))
-            for lvl, label in (("High", "🔴 High"), ("Medium", "🟠 Medium"), ("Low", "🟡 Low")):
-                chk = QCheckBox(f"{label} impact")
+            improw = QHBoxLayout()
+            self.imp_chks: dict = {}
+            for lvl, label in (("High", "🔴 High"), ("Medium", "🟠 Med"), ("Low", "🟡 Low")):
+                chk = QCheckBox(label)
                 chk.setChecked(lvl in active)
                 self.imp_chks[lvl] = chk
-                form.addWidget(chk)
-            self.cur_chks: dict[str, QCheckBox] = {}
+                improw.addWidget(chk)
+            improw.addStretch(1)
+            form.addLayout(improw)
+            currow = QHBoxLayout()
+            self.cur_chks: dict = {}
             cur_active = set(s.get("currencies", ALL_CURRENCIES))
             for cur in ALL_CURRENCIES:
                 chk = QCheckBox(cur)
                 chk.setChecked(cur in cur_active)
                 self.cur_chks[cur] = chk
-                form.addWidget(chk)
+                currow.addWidget(chk)
+            currow.addStretch(1)
+            form.addLayout(currow)
             self.refresh_cb = QComboBox()
             for minutes in (5, 10, 15, 30, 60):
                 self.refresh_cb.addItem(f"{minutes} minutes", minutes)
             cur_min = int(s.get("news_refresh_minutes", 15))
             idx = [i for i, mm in enumerate((5, 10, 15, 30, 60)) if mm == cur_min]
             self.refresh_cb.setCurrentIndex(idx[0] if idx else 2)
-            row("Refresh news every", self.refresh_cb)
-
-            # ---- Behaviour & startup
-            section("Behaviour & startup")
+            row("Refresh news", self.refresh_cb)
             self.alerts_chk = QCheckBox("Desktop notifications (market + high-impact news)")
             self.alerts_chk.setChecked(bool(s.get("alerts_enabled", True)))
             form.addWidget(self.alerts_chk)
+
+            # ---- Window & Startup
+            section("Window & Startup")
+            self.theme_cb = QComboBox()
+            for key in THEME_ORDER:
+                self.theme_cb.addItem(f"{THEME_ICON[key]}  {THEME_LABELS[key]}", key)
+            self.theme_cb.setCurrentIndex(THEME_ORDER.index(s.get("theme", "system")))
+            row("Theme", self.theme_cb)
+            self.sel_cb = QComboBox()
+            for m in MARKETS:
+                self.sel_cb.addItem(f"{m['flag']}  {m['name']}", m["id"])
+            self.sel_cb.setCurrentIndex(MARKET_IDS.index(s.get("selected_market", "LONDON")))
+            row("Default market", self.sel_cb)
             self.drawer_chk = QCheckBox("Open news drawer by default")
             self.drawer_chk.setChecked(bool(s.get("news_drawer_expanded", True)))
             form.addWidget(self.drawer_chk)
@@ -1096,8 +1125,9 @@ if HAS_QT:
             self.leftclick_cb = QComboBox()
             self.leftclick_cb.addItem("Open panel", "panel")
             self.leftclick_cb.addItem("Open menu", "menu")
-            self.leftclick_cb.setCurrentIndex(0 if s.get("left_click_action", "panel") == "panel" else 1)
-            row("Left-click tray icon", self.leftclick_cb)
+            self.leftclick_cb.setCurrentIndex(
+                0 if s.get("left_click_action", "panel") == "panel" else 1)
+            row("Left-click icon", self.leftclick_cb)
             self.autostart_chk = QCheckBox("Start on login (silent, in tray)")
             self.autostart_chk.setChecked(is_autostart_enabled())
             form.addWidget(self.autostart_chk)
@@ -1122,6 +1152,12 @@ if HAS_QT:
             self.install_btn.setVisible(False)
             up_row.addWidget(self.install_btn)
             form.addLayout(up_row)
+
+            foot = QLabel(f"Market Sync v{APP_VERSION}  •  Developed by Mahabub H. Aabir")
+            foot.setProperty("class", "muted")
+            foot.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            form.addSpacing(4)
+            form.addWidget(foot)
             form.addStretch(1)
 
             # ---- bottom buttons
@@ -1146,6 +1182,72 @@ if HAS_QT:
 
             self._poll = QTimer(self)
             self._poll.timeout.connect(self._poll_check)
+            self._refresh_preview()
+
+        # -- segmented control helper (v0.2 pills)
+        def _seg(self, options, current, preview: bool = True):
+            w = QWidget()
+            h = QHBoxLayout(w)
+            h.setContentsMargins(0, 0, 0, 0)
+            h.setSpacing(4)
+            grp = QButtonGroup(w)
+            grp.setExclusive(True)
+            buttons = []
+            for val, label in options:
+                b = QPushButton(label)
+                b.setCheckable(True)
+                b.setProperty("seg", "1")
+                b.setProperty("segValue", val)
+                b.setCursor(Qt.CursorShape.PointingHandCursor)
+                b.setChecked(val == current)
+                if preview:
+                    b.clicked.connect(self._refresh_preview)
+                grp.addButton(b)
+                h.addWidget(b)
+                buttons.append(b)
+            w._buttons = buttons  # type: ignore[attr-defined]
+            return w
+
+        def _seg_value(self, w, fallback: str = "panel"):
+            for b in w._buttons:  # type: ignore[attr-defined]
+                if b.isChecked():
+                    return b.property("segValue")
+            return fallback
+
+        def _refresh_preview(self):
+            t = self._t
+            layout_mode = self._seg_value(self.seg_layout, "compact")
+            time_as = self._seg_value(self.seg_timeas, "countdown")
+            fmt12 = self._seg_value(self.seg_format, "24h") == "12h"
+            sessions = self._seg_value(self.seg_sessions, "active_and_next")
+            icon = self._seg_value(self.seg_icon, "text")
+            if icon == "logo":
+                self.preview.setText(
+                    f'<span style="color:{t["muted"]}">Logo icon + green/gray status dot in the tray</span>')
+                return
+            sample = [
+                ("LON", "London", "+02:14", "14:32", True),
+                ("NYC", "New York", "-05:02", "09:02", False),
+                ("SYD", "Sydney", "-12:40", "23:40", False),
+            ]
+            if sessions == "active_only":
+                shown = sample[:1]
+            elif sessions == "active_and_next":
+                shown = sample[:2]
+            else:
+                shown = sample
+            parts = []
+            for sym, full, cd, clock, is_open in shown:
+                name = sym if layout_mode == "compact" else full
+                val = clock if time_as == "local_time" else cd
+                col = GREEN if is_open else t["muted"]
+                dot = "●" if is_open else "○"
+                parts.append(f'<span style="color:{col};">{dot} {name} {val}</span>')
+            self.preview.setText(
+                "&nbsp;&nbsp;".join(parts)
+                + f'<br><span style="color:{t["muted"]}; font-size:10px;">'
+                + ("12-hour clock &nbsp;•&nbsp; " if fmt12 else "")
+                + "open markets bright, closed dimmed</span>")
 
         # -- updates
         def _check_now(self):
@@ -1181,21 +1283,22 @@ if HAS_QT:
         # -- save
         def _save(self):
             s = self.c.settings
-            s["theme"] = self.theme_cb.currentData()
-            s["time_format"] = self.fmt_cb.currentData()
-            s["tray_mode"] = self.traymode_cb.currentData()
-            s["tray_icon_style"] = self.icon_cb.currentData()
+            s["tray_layout"] = self._seg_value(self.seg_layout, "compact")
+            s["tray_time_as"] = self._seg_value(self.seg_timeas, "countdown")
+            s["time_format"] = self._seg_value(self.seg_format, "24h")
+            s["tray_sessions"] = self._seg_value(self.seg_sessions, "active_and_next")
+            s["tray_icon_style"] = self._seg_value(self.seg_icon, "text")
             s["active_brighten"] = self.brighten_chk.isChecked()
-            s["news_drawer_expanded"] = self.drawer_chk.isChecked()
-            s["auto_hide_panel"] = self.autohide_chk.isChecked()
-            s["left_click_action"] = self.leftclick_cb.currentData()
+            s["market_display"] = {
+                mid: self._seg_value(seg, "panel") for mid, seg in self.route_segs.items()}
+            s["theme"] = self.theme_cb.currentData()
             s["alerts_enabled"] = self.alerts_chk.isChecked()
             s["start_hidden"] = self.hidden_chk.isChecked()
             s["selected_market"] = self.sel_cb.currentData()
             s["news_refresh_minutes"] = self.refresh_cb.currentData()
-            for key, chk in self.disp_chks.items():
-                s[key] = chk.isChecked()
-            s["market_loop"] = {mid: chk.isChecked() for mid, chk in self.loop_chks.items()}
+            s["news_drawer_expanded"] = self.drawer_chk.isChecked()
+            s["auto_hide_panel"] = self.autohide_chk.isChecked()
+            s["left_click_action"] = self.leftclick_cb.currentData()
             impacts = [lvl for lvl, chk in self.imp_chks.items() if chk.isChecked()]
             s["active_impacts"] = impacts or ["High", "Medium", "Low"]
             curs = [cur for cur, chk in self.cur_chks.items() if chk.isChecked()]
@@ -1205,6 +1308,7 @@ if HAS_QT:
             self.c._save()
             self.c._build_menu()
             self.c.panel.apply_theme()
+            self.c.panel.rebuild_grid()
             self.c.panel.drawer.set_expanded(bool(s["news_drawer_expanded"]))
             self.c.tick()
             self.accept()
@@ -1605,27 +1709,40 @@ class TrayController:
 
     # ---------------- tray text/icon (v0.2 parity)
     def _multi_segments(self):
-        loop = self.settings.get("market_loop", {})
-        segs = []
-        any_open = False
-        for s in self.statuses:
+        """Build tray text tokens per v0.2 prefs: layout, time-as, sessions."""
+        md = self.settings.get("market_display", {})
+        sessions = self.settings.get("tray_sessions", "active_and_next")
+        layout_mode = self.settings.get("tray_layout", "compact")
+        time_as = self.settings.get("tray_time_as", "countdown")
+        is_12h = self.settings.get("time_format", "24h") == "12h"
+
+        def eligible(s):
+            return md.get(s["market"]["id"], "panel") == "panel"
+
+        def token(s):
             m = s["market"]
-            if not loop.get(m["id"], True):
-                continue
-            if s["is_open"]:
-                any_open = True
-                cd = engine.format_signed_countdown(s["countdown"], True).replace(" ", "")
-                segs.append((f"{m['symbol']} {cd}", True))
-        closed = [s for s in self.statuses
-                  if not s["is_open"] and loop.get(s["market"]["id"], True)]
-        if closed:
-            s = min(closed, key=lambda x: x["countdown"].total_seconds())
-            cd = engine.format_signed_countdown(s["countdown"], False).replace(" ", "")
-            segs.append((f"{s['market']['symbol']} {cd}", False))
+            name = m["symbol"] if layout_mode == "compact" else m["name"]
+            if time_as == "local_time":
+                val = engine.format_local_clock(s["now_local"], is_12h)
+            else:
+                val = engine.format_signed_countdown(
+                    s["countdown"], s["is_open"]).replace(" ", "")
+            return (f"{name} {val}", bool(s["is_open"]))
+
+        opens = [s for s in self.statuses if s["is_open"] and eligible(s)]
+        closed = sorted(
+            [s for s in self.statuses if not s["is_open"] and eligible(s)],
+            key=lambda x: x["countdown"].total_seconds())
+        if sessions == "active_only":
+            chosen = opens if opens else closed[:1]
+        elif sessions == "active_and_next":
+            chosen = opens + closed[:1]
+        else:  # all
+            chosen = opens + closed
+        segs = [token(s) for s in chosen]
         if not segs:
-            s = self.selected
-            cd = engine.format_signed_countdown(s["countdown"], s["is_open"]).replace(" ", "")
-            segs.append((f"{s['market']['symbol']} {cd}", bool(s["is_open"])))
+            segs = [token(self.selected)]
+        any_open = any(s["is_open"] for s in self.statuses)
         return segs, any_open
 
     def tick(self):

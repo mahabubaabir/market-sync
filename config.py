@@ -7,7 +7,7 @@ from copy import deepcopy
 
 APP_NAME = "Market Sync"
 APP_ID = "market-sync"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 
 # GitHub repo used by the one-line installer + auto-update checker.
 # Change these two lines if you fork / rename the project.
@@ -119,11 +119,16 @@ DEFAULT_SETTINGS = {
     "time_format": "24h",   # 24h | 12h
     "active_brighten": True,  # brighten open markets, dim closed ones
     "news_drawer_expanded": True,
-    # Tray presentation (v0.2 applet parity)
-    "tray_mode": "multi",           # multi (open + next) | single (selected market)
+    # Tray presentation (v0.2 prefs parity)
+    "tray_mode": "multi",           # multi (old style) | single (selected market)
     "tray_icon_style": "text",      # text | logo
-    "market_loop": {                # which markets appear in multi tray text
-        "LONDON": True, "NEW_YORK": True, "SYDNEY": True, "TOKYO": True, "NYSE": True,
+    "tray_layout": "compact",       # compact (symbols) | standard (names)
+    "tray_time_as": "countdown",    # countdown | local_time
+    "tray_sessions": "active_and_next",  # active_only | active_and_next | all
+    # v0.2 per-market routing: none = hide card; popup = panel only; panel = + tray
+    "market_display": {
+        "LONDON": "panel", "NEW_YORK": "panel", "SYDNEY": "panel",
+        "TOKYO": "panel", "NYSE": "panel",
     },
     "show_symbol": True,
     "show_countdown": True,
@@ -222,11 +227,25 @@ def load_settings() -> dict:
             imp = settings.get("active_impacts")
             if not isinstance(imp, list) or not set(imp) <= {"High", "Medium", "Low"} or not imp:
                 settings["active_impacts"] = ["High", "Medium", "Low"]
-            # market_loop: keep known ids only, default True
-            loop = settings.get("market_loop")
-            if not isinstance(loop, dict):
-                loop = {}
-            settings["market_loop"] = {mid: bool(loop.get(mid, True)) for mid in MARKET_IDS}
+            # migration: market_loop (bool) -> market_display (none/popup/panel)
+            if "market_display" not in user and isinstance(user.get("market_loop"), dict):
+                settings["market_display"] = {
+                    mid: ("panel" if user["market_loop"].get(mid, True) else "popup")
+                    for mid in MARKET_IDS
+                }
+            md = settings.get("market_display")
+            if not isinstance(md, dict):
+                md = {}
+            settings["market_display"] = {
+                mid: (md.get(mid) if md.get(mid) in ("none", "popup", "panel") else "panel")
+                for mid in MARKET_IDS
+            }
+            if settings.get("tray_layout") not in ("compact", "standard"):
+                settings["tray_layout"] = "compact"
+            if settings.get("tray_time_as") not in ("countdown", "local_time"):
+                settings["tray_time_as"] = "countdown"
+            if settings.get("tray_sessions") not in ("active_only", "active_and_next", "all"):
+                settings["tray_sessions"] = "active_and_next"
     except Exception:
         pass
     return settings

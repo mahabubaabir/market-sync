@@ -4,6 +4,25 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.3.1 — 2026-09-19 — v0.2 Preferences dialog
+- Rebuilt ⚙️ Preferences to mirror the old v0.2 window:
+  - **Live tray preview** strip (updates as you change options)
+  - Segmented controls: **Layout** (Compact Symbols / Standard Names),
+    **Show Time As** (Local Time / Countdown), **Format** (12h / 24h),
+    **Tray Sessions** (Active Only / Active + Next / All), Tray icon
+    (Text / Logo + dot)
+  - **Market List** routing per market: **None** (hide card) /
+    **Popup** (panel only) / **+ Tray** (also in tray loop)
+  - News (impacts, currencies, refresh, alerts), Window & Startup
+    (theme, default market, drawer, auto-hide, left-click, autostart,
+    start hidden), Updates (check + install), footer with version/author
+    and the red Quit app button
+- Panel grid now rebuilds on routing changes (hidden cards collapse the grid)
+- Tray text builder respects layout / time-as / sessions / routing
+- Settings: `market_display`, `tray_layout`, `tray_time_as`, `tray_sessions`;
+  migration from `market_loop` (True → + Tray, False → Popup)
+- README: preferences screenshot added to docs/screenshots
+
 ### v1.3.0 — 2026-09-19 — full v0.2 layout parity
 Structure now matches Market Sync v0.2, not just the skin:
 - **Panel**: market card grid (2 columns, 88px v0.2 cards with landmark,
