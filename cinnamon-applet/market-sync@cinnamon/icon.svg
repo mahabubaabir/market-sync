@@ -1,29 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
-  <!-- Market Sync — twin synchronizing arcs converging on an illuminated core -->
-  <defs>
-    <linearGradient id="syncGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#38bdf8"/>
-      <stop offset="100%" stop-color="#6366f1"/>
-    </linearGradient>
-    <linearGradient id="syncGrad2" x1="100%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" stop-color="#10b981"/>
-      <stop offset="100%" stop-color="#06b6d4"/>
-    </linearGradient>
-    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
-      <feGaussianBlur stdDeviation="4"/>
-    </filter>
-  </defs>
-
-  <!-- Upper arc: cyan -> indigo -->
-  <path d="M 50,14 A 36,36 0 0,1 86,50 A 36,36 0 0,1 77.5,73.5 L 68,64 A 24,24 0 0,0 74,50 A 24,24 0 0,0 50,26 L 50,36 L 32,20 L 50,4 Z"
-        fill="url(#syncGrad1)"/>
-
-  <!-- Lower arc: emerald -> cyan -->
-  <path d="M 50,86 A 36,36 0 0,1 14,50 A 36,36 0 0,1 22.5,26.5 L 32,36 A 24,24 0 0,0 26,50 A 24,24 0 0,0 50,74 L 50,64 L 68,80 L 50,96 Z"
-        fill="url(#syncGrad2)"/>
-
-  <!-- Glowing convergence core -->
-  <circle cx="50" cy="50" r="7" fill="#ffffff" filter="url(#glow)" opacity="0.9"/>
-  <circle cx="50" cy="50" r="7" fill="#ffffff"/>
-  <circle cx="50" cy="50" r="4" fill="#38bdf8"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#23262b" stroke="#3d434b" stroke-width="2"/>
+  <circle cx="16" cy="16" r="6" fill="#8ecd76"/>
+  <circle cx="62" cy="2" r="0" fill="none"/>
+  <circle cx="32" cy="36" r="18" fill="none" stroke="#e8eaed" stroke-width="3"/>
+  <line x1="32" y1="36" x2="32" y2="24" stroke="#8ecd76" stroke-width="3" stroke-linecap="round"/>
+  <line x1="32" y1="36" x2="41" y2="40" stroke="#ffcb6b" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="32" cy="36" r="2.6" fill="#e8eaed"/>
 </svg>

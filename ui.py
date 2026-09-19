@@ -499,7 +499,7 @@ def make_tray_logo_icon(any_open: bool, size: int = 24) -> "QIcon":
     pm.fill(Qt.GlobalColor.transparent)
     p = QPainter(pm)
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    logo_path = os.path.join(ASSETS_DIR, "logo.svg")
+    logo_path = os.path.join(ASSETS_DIR, "icon.svg")
     if HAS_SVG and os.path.exists(logo_path):
         r = QSvgRenderer(logo_path)
         r.render(p, QRectF(2, 2, size - 4, size - 4))
@@ -989,7 +989,7 @@ class SessionPanel(QWidget):
         self.logo.setFixedSize(20, 20)
         logo_pm = QPixmap(20, 20)
         logo_pm.fill(Qt.GlobalColor.transparent)
-        logo_path = os.path.join(ASSETS_DIR, "logo.svg")
+        logo_path = os.path.join(ASSETS_DIR, "icon.svg")
         if HAS_SVG and os.path.exists(logo_path):
             r = QSvgRenderer(logo_path)
             p = QPainter(logo_pm)
@@ -1321,7 +1321,7 @@ if HAS_QT:
             foot_logo.setFixedSize(18, 18)
             fpm = QPixmap(18, 18)
             fpm.fill(Qt.GlobalColor.transparent)
-            lp = os.path.join(ASSETS_DIR, "logo.svg")
+            lp = os.path.join(ASSETS_DIR, "icon.svg")
             if HAS_SVG and os.path.exists(lp):
                 r = QSvgRenderer(lp)
                 pp = QPainter(fpm)
