@@ -1,7 +1,7 @@
 # Market Sync — Complete Design System & Architecture Specification
 
 **Project**: Market Sync (`market-sync`)  
-**Current Version**: `v1.3.2` (Design Language `v0.2` & `v2.0` Glass Parity)  
+**Current Version**: `v1.4.2` (Design Language `v0.2` & `v2.0` Glass Parity)  
 **Developer**: **Mahabub H. Aabir** (`maha_bub@outlook.com`)  
 **Official Repository**: [https://github.com/mahabubaabir/market-sync](https://github.com/mahabubaabir/market-sync)  
 **Target Environments**: Linux Mint 21/22+ (Cinnamon 5.x/6.x), Ubuntu 22.04/24.04+ (Cinnamon/GNOME/XFCE)  
@@ -18,7 +18,7 @@
 2. **Neon Active Highlights**: Open, active trading hubs illuminate with a vivid neon-green glow (`#30d158`), high-contrast badge rings, and border accents.
 3. **Muted Off-State Legibility**: Closed or off-session hubs use crisp, readable silvery-white slate (`#cbd5e1`) instead of overly dark or illegible tones.
 4. **Minimal Panel Footprint**: Saves over 60% of top bar horizontal space by using 3-letter symbols (`LON`, `NYC`, `SYD`, `TYO`), tight formatting (`+04:05`), and smart session filters (`Active + Next`).
-5. **All-in-One Unified Top Panel Integration**: The Cinnamon applet houses the **App Logo**, the **Live Countdown**, **Left-Click to Open Panel**, and **Right-Click for App Menu** in one single widget, automatically hiding duplicate tray icons.
+5. **All-in-One Unified Top Panel Integration**: The Cinnamon applet is a **text-only** widget (`Applet.TextApplet`, no icon actor) showing the **Live Countdown** with **Left-Click to Open Panel** and **Right-Click for App Menu**. The twin-arrow logo lives on the app window, panel brand bar, and standalone tray icon (both-in-one).
 
 ---
 
@@ -115,19 +115,21 @@ Each financial hub is represented by a dedicated vector landmark icon rendered i
 The official Market Sync emblem represents global financial liquidity and time synchronicity.
 
 ```
-         ▲
-       /   \       Upper Arc: Cyan -> Indigo (#38bdf8 to #6366f1)
-     │       │
-     │   ●   │     Core: Glowing Convergence Center (fill #ffffff, glow #38bdf8)
-     │       │
-       \   /       Lower Arc: Emerald -> Cyan (#10b981 to #06b6d4)
-         ▼
+          ▲
+        /   \       Upper Arrow: Cyan -> Indigo (#67e8f9 to #6366f1)
+      │       │
+      │   ●   │     Core: white convergence point (r=7) with cyan pupil (r=4, #38bdf8)
+      │       │
+        \   /       Lower Arrow: Emerald -> Cyan (#34d399 to #22d3ee)
+          ▼
 ```
 
-### SVG Path Structure (`assets/logo.svg`)
-- **Upper Arc**: `M 50,14 A 36,36 0 0,1 86,50 A 36,36 0 0,1 77.5,73.5 L 68,64 A 24,24 0 0,0 74,50 A 24,24 0 0,0 50,26 L 50,36 L 32,20 L 50,4 Z`
-- **Lower Arc**: `M 50,86 A 36,36 0 0,1 14,50 A 36,36 0 0,1 22.5,26.5 L 32,36 A 24,24 0 0,0 26,50 A 24,24 0 0,0 50,74 L 50,64 L 68,80 L 50,96 Z`
-- **Center Core**: Glowing white center circle (`r=7`, feGaussianBlur glow) with cyan focus ring (`r=4`, fill `#38bdf8`).
+### SVG Path Structure (`assets/icon.svg`, `assets/logo.svg`)
+- **Canvas**: transparent `100x100` — no squircle/clock container (removed in v1.4.2). Two opposing sync arrows meet at the center core.
+- **Upper Arrow**: `M50 9 A41 41 0 0 1 91 50 A41 41 0 0 1 80 78 L68 66 A24 24 0 0 0 74 50 A24 24 0 0 0 50 26 L50 38 L28 19 L50 0 Z` (gradient `syncGrad1`: `#67e8f9` → `#6366f1`)
+- **Lower Arrow**: `M50 91 A41 41 0 0 1 9 50 A41 41 0 0 1 20 22 L32 34 A24 24 0 0 0 26 50 A24 24 0 0 0 50 74 L50 62 L72 81 L50 100 Z` (gradient `syncGrad2`: `#34d399` → `#22d3ee`)
+- **Center Core**: white circle (`r=7`) with cyan pupil (`r=4`, fill `#38bdf8`).
+- **Packaging**: `tools/render_icons.py` renders `assets/icon.svg` into all hicolor PNG sizes; no hand-drawn clock fallback remains.
 
 ---
 
@@ -152,12 +154,15 @@ Users can select their preferred horizontal footprint in **Preferences > Panel S
 | **`All`** | `● LON +04:05  ○ NYC -00:35  ○ SYD -57:35  ○ TYO -60:35` | 55 chars | Baseline |
 
 ### 6.3 All-In-One Unified Behavior
+- **Text-only applet**: `applet.js` extends `Applet.TextApplet` — there is no icon actor, so the top bar shows sessions only (e.g. `● LON +04:05  ○ NYC -00:35`). The twin-arrow `icon.png` / `icon.svg` beside it exist only for the Applets-manager catalog list.
 - **Left-Click**: Invokes `market-sync --toggle` to raise or dismiss the Glass UI dropdown.
 - **Right-Click**: Displays the native Cinnamon context menu with:
-  - *Toggle Market Sync*
+  - *Toggle Panel*
   - *Preferences...*
   - *Quit Market Sync*
-- **Systray Suppression**: When the Cinnamon applet is detected on the panel, the duplicate Qt tray icon automatically hides, keeping your panel clean and clutter-free.
+- **Both-in-one tray**: the standalone Qt `QSystemTrayIcon` stays visible while the applet runs (`show_standalone_tray: true` by default; Preferences can uncheck it for applet-only). Tray styles via `tray_icon_style` in settings:
+  - `logo` (recommended): compact 24px twin-arrow mark + green/grey status dot — always legible in Cinnamon's tray.
+  - `text`: wide rendered session strip (`○ SYD -39:19`); Cinnamon's tray can squeeze wide pixmaps into a blank-looking slot, so prefer `logo` when both applet and tray are shown.
 
 ---
 
@@ -187,17 +192,17 @@ $$\text{Progress} = \frac{\text{Now} - \text{SessionStart}}{\text{SessionEnd} - 
 market-sync/
 ├── assets/                       # Vector SVGs and app branding
 │   ├── logo.svg                  # Minimal Market Sync twin-arc logo
-│   ├── icon.svg                  # Squircle app icon
+│   ├── icon.svg                  # Transparent twin-arrow app icon (window, brand bar, tray, hicolor)
 │   ├── london.svg                # London Eye landmark
 │   ├── new_york.svg              # Statue of Liberty landmark
 │   ├── sydney.svg                # Sydney Opera House landmark
 │   └── tokyo.svg                 # Torii Gate landmark
 ├── cinnamon-applet/              # Native Cinnamon top panel applet
 │   └── market-sync@cinnamon/
-│       ├── applet.js             # TextIconApplet engine & Pango renderer
+│       ├── applet.js             # TextApplet text-only engine & Pango renderer
 │       ├── metadata.json         # Cinnamon applet manifest
-│       ├── icon.png              # 128x128 crisp applet icon
-│       └── icon.svg              # Vector applet icon
+│       ├── icon.png              # 128x128 Applets-manager catalog icon (twin-arrow)
+│       └── icon.svg              # Vector catalog icon (twin-arrow)
 ├── autostart/                    # Desktop autostart manifest
 │   └── market-sync.desktop
 ├── config.py                     # Central configuration, defaults, paths

@@ -22,10 +22,10 @@ function MarketSyncApplet(metadata, orientation, panel_height, instance_id) {
 }
 
 MarketSyncApplet.prototype = {
-    __proto__: Applet.TextIconApplet.prototype,
+    __proto__: Applet.TextApplet.prototype,
 
     _init: function(metadata, orientation, panel_height, instance_id) {
-        Applet.TextIconApplet.prototype._init.call(this, orientation, panel_height, instance_id);
+        Applet.TextApplet.prototype._init.call(this, orientation, panel_height, instance_id);
         this.metadata = metadata;
 
         // Rich Pango markup for bright-open / dim-closed session chips
@@ -36,10 +36,7 @@ MarketSyncApplet.prototype = {
         this.set_applet_label("Market Sync");
         this.set_applet_tooltip("Market Sync — click to open the panel");
 
-        // Sessions only in the top bar — no logo/icon.
-        if (this._applet_icon) {
-            this._applet_icon.hide();
-        }
+        // TextApplet has no icon actor, so the applet stays text-only.
         this._setup_context_menu();
         this._update();
 

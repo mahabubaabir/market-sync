@@ -12,20 +12,28 @@ economic calendar.
 
 ## Install (one command)
 
+Latest release: **v1.4.2** — older `.deb` releases were pruned, so always
+install the newest asset from the
+[Releases page](https://github.com/mahabubaabir/market-sync/releases).
+
 ```bash
 curl -sL https://raw.githubusercontent.com/mahabubaabir/market-sync/main/install.sh | sudo bash
 ```
 
-Then put it on your Cinnamon panel (both-in-one: applet **and** tray icon):
+Then put it on your Cinnamon panel (both-in-one: text-only applet **and**
+twin-arrow tray icon):
 
 ```bash
 cd /opt/market-sync && ./install-applet.sh
 ```
 
 - **Launch:** `market-sync` (or Super → "Market Sync")
-- **Top panel:** `● LON +04:05  ○ NYC -00:35` — bright green when open,
-  silvery when closed. **Left-click opens the same panel as the tray icon.**
-  Right-click: Toggle / Preferences… / Quit
+- **Top panel applet (text-only):** `● LON +04:05  ○ NYC -00:35` — bright
+  green when open, silvery when closed. **Left-click opens the same panel
+  as the tray icon.** Right-click: Toggle Panel / Preferences… / Quit
+- **Standalone tray:** compact twin-arrow logo with a green/grey status dot
+  (`tray_icon_style: logo` in settings is recommended — the wide `text`
+  strip can render as a blank slot in Cinnamon's tray)
 - **IPC:** `market-sync --toggle` · `--show` · `--hide` · `--preferences` · `--quit`
 - **At login:** starts silently in the tray
 - **Quit:** tray menu, panel ✕ … or Preferences → Quit app
@@ -67,7 +75,7 @@ Collapsed (dark) and Preferences (Design System v2.0):
 
 | Feature | Notes |
 |---|---|
-| Cinnamon top-panel applet | Live `● LON +04:05` sessions via `panel_status.json`, left-click → panel, right-click menu — **and** the standalone tray icon stays (both-in-one) |
+| Cinnamon top-panel applet | Text-only live `● LON +04:05` sessions via `panel_status.json`, left-click → panel, right-click menu — **and** the standalone twin-arrow tray icon stays (both-in-one) |
 | Glass dropdown (v2.0) | 410px frosted panel, radius 14, translucent glass over any wallpaper |
 | Landmark market cards | 2-column 82px cards: London Eye, Statue of Liberty, Sydney Opera House, Torii Gate badges; big signed countdowns; OPEN/CLOSED pills; progress rings |
 | Neon active highlights | Open sessions glow `#30d158`; closed states stay readable silvery slate (toggleable) |
@@ -93,19 +101,30 @@ Applet        left-click → same glass panel as the tray icon
 Tray icon     left-click → panel (✕ hides), right-click → full menu
 ```
 
-## Auto-updates
+## Auto-updates (future updates)
 
-Market Sync checks GitHub Releases once a day (and on demand). When a newer
-version exists you get a desktop notification, and the menu shows
-**⬆ Update to vX.Y.Z** — one click downloads the `.deb` and installs it
-through a graphical password prompt, then restarts.
+Market Sync checks GitHub Releases once a day (and on demand via the
+Preferences “Check now” button). When a newer version exists you get a
+desktop notification, and the menu shows **⬆ Update to vX.Y.Z** — one click
+downloads the `.deb` and installs it through a graphical password prompt,
+then restarts.
+
+Manual update path (same as fresh install):
+
+```bash
+curl -sL https://raw.githubusercontent.com/mahabubaabir/market-sync/main/install.sh | sudo bash
+cd /opt/market-sync && ./install-applet.sh   # refresh the panel applet copy
+```
+
+Only the latest release is kept on GitHub, so updating always pulls the
+newest `.deb` — no need to pick between old versions.
 
 ## Releasing (maintainer)
 
 ```bash
 # bump APP_VERSION in config.py, then:
-git add -A && git commit -m "release v1.4.0"
-git tag v1.4.0 && git push origin main --tags
+git add -A && git commit -m "release vX.Y.Z"
+git tag vX.Y.Z && git push origin main --tags
 ```
 
 GitHub Actions builds the `.deb` and attaches it to the release automatically.
