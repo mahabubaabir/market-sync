@@ -1,4 +1,4 @@
-Package: session-sync
+Package: market-sync
 Version: __VERSION__
 Section: utils
 Priority: optional
@@ -8,7 +8,7 @@ Recommends: pkexec | policykit-1
 Maintainer: mahabubaabir <mahabubaabir@users.noreply.github.com>
 Homepage: https://github.com/mahabubaabir/market-sync
 Description: Market countdown + economic news in your system tray
- Session Sync shows a live open/close countdown for Sydney, Tokyo, London,
+ Market Sync shows a live open/close countdown for Sydney, Tokyo, London,
  New York FX and NYSE, a DST-aware market clock next to your local time,
  and the next economic events from the ForexFactory calendar.
  .

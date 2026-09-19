@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Session Sync — market countdown + news for Linux Mint.
+"""Market Sync — market countdown + news for Linux Mint.
 
 Tray app (PyQt6) with CLI fallback:
   python3 main.py                  -> tray + panel (needs PyQt6)
@@ -78,7 +78,7 @@ def _single_instance_or_exit() -> None:
             fh.write(str(os.getpid()))
             fh.flush()
             return
-        print("Session Sync is already running (tray icon active).", file=sys.stderr)
+        print("Market Sync is already running (tray icon active).", file=sys.stderr)
         sys.exit(0)
     except SystemExit:
         raise
@@ -131,7 +131,7 @@ def run_gui(args) -> int:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(prog="session-sync", description="Market countdown + news for Linux Mint")
+    ap = argparse.ArgumentParser(prog="market-sync", description="Market countdown + news for Linux Mint")
     ap.add_argument("--market", choices=[m["id"] for m in MARKETS], help="market to track")
     ap.add_argument("--cli", action="store_true", help="text mode (no Qt needed)")
     ap.add_argument("--once", action="store_true", help="with --cli: print once and exit")

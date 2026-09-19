@@ -1,4 +1,4 @@
-# ◉ Session Sync
+# ◉ Market Sync
 
 Free, open-source **market countdown + economic news** for the Linux desktop
 (Cinnamon / MATE / Xfce / GNOME tray) — inspired by
@@ -20,12 +20,12 @@ curl -sL https://raw.githubusercontent.com/mahabubaabir/market-sync/main/install
 That downloads the latest `.deb` release and installs it with `apt` —
 dependencies (PyQt6, notifications, etc.) are resolved automatically.
 
-- **Launch:** `session-sync` (or press Super → search "Session Sync")
+- **Launch:** `market-sync` (or press Super → search "Market Sync")
 - **At login:** starts silently in the tray (no popup). Disable anytime from
   the panel's "Start on login" checkbox.
-- **Quit:** tray icon → right-click → *Quit Session Sync*, or the red
+- **Quit:** tray icon → right-click → *Quit Market Sync*, or the red
   **Quit app** button in the panel. Closing the terminal never kills it.
-- **Uninstall:** `sudo apt remove session-sync`
+- **Uninstall:** `sudo apt remove market-sync`
 
 <details>
 <summary>Manual install / build from source</summary>
@@ -33,8 +33,8 @@ dependencies (PyQt6, notifications, etc.) are resolved automatically.
 ```bash
 git clone https://github.com/mahabubaabir/market-sync
 cd market-sync
-./build-deb.sh                       # → dist/session-sync_<version>_all.deb
-sudo apt install ./dist/session-sync_*_all.deb
+./build-deb.sh                       # → dist/market-sync_<version>_all.deb
+sudo apt install ./dist/market-sync_*_all.deb
 ```
 
 Dev run without installing:
@@ -90,10 +90,10 @@ Every installed copy is notified within 24 hours.
 
 ## Settings & data
 
-- `~/.config/session-sync/settings.json` — market, theme, filters, toggles
-- `~/.cache/session-sync/calendar.json` — news cache (15 min TTL)
-- `~/.cache/session-sync/update.json` — update check cache (24 h)
-- `~/.cache/session-sync/app.log` — launcher log (rotates at 1 MB)
+- `~/.config/market-sync/settings.json` — market, theme, filters, toggles
+- `~/.cache/market-sync/calendar.json` — news cache (15 min TTL)
+- `~/.cache/market-sync/update.json` — update check cache (24 h)
+- `~/.cache/market-sync/app.log` — launcher log (rotates at 1 MB)
 
 ## Data & credit
 

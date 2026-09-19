@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Session Sync
+Name=Market Sync
 Comment=Market countdown + economic news in your tray
-Exec=session-sync
-Icon=session-sync
+Exec=market-sync
+Icon=market-sync
 Terminal=false
 Categories=Finance;Office;
 StartupNotify=false

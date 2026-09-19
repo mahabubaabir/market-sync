@@ -1,4 +1,4 @@
-"""Session Sync — Market Countdown + News for Linux Mint (Cinnamon tray).
+"""Market Sync — Market Countdown + News for Linux Mint (Cinnamon tray).
 
 Safe, resource-efficient tray app with left-click panel and right-click menu.
 """
@@ -431,7 +431,7 @@ class SessionPanel(QWidget):
         self.quit_btn = QPushButton("Quit app")
         self.quit_btn.setProperty("class", "quitbtn")
         self.quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.quit_btn.setToolTip("Fully close Session Sync")
+        self.quit_btn.setToolTip("Fully close Market Sync")
         self.quit_btn.clicked.connect(self.c.quit_app)
         actionrow.addWidget(self.quit_btn, 1)
         root.addLayout(actionrow)
@@ -746,7 +746,7 @@ class TrayController:
         self.menu.addAction(cu)
 
         self.menu.addSeparator()
-        q = QAction("❌ Quit Session Sync", self.menu)
+        q = QAction("❌ Quit Market Sync", self.menu)
         q.triggered.connect(self.quit_app)
         self.menu.addAction(q)
 
@@ -839,7 +839,7 @@ class TrayController:
                 if not os.path.exists(SYSTEM_AUTOSTART_PATH):
                     icon = os.path.join(app_dir(), "assets", "icon.svg")
                     with open(USER_AUTOSTART_PATH, "w", encoding="utf-8") as f:
-                        f.write("[Desktop Entry]\nType=Application\nName=Session Sync\n"
+                        f.write("[Desktop Entry]\nType=Application\nName=Market Sync\n"
                                 "Comment=Market countdown + news\n"
                                 f"Exec={autostart_exec_line()}\n"
                                 f"Path={app_dir()}\nIcon={icon}\nTerminal=false\n"
@@ -849,7 +849,7 @@ class TrayController:
                 if os.path.exists(SYSTEM_AUTOSTART_PATH):
                     # Disable the system entry for this user only.
                     with open(USER_AUTOSTART_PATH, "w", encoding="utf-8") as f:
-                        f.write("[Desktop Entry]\nType=Application\nName=Session Sync\n"
+                        f.write("[Desktop Entry]\nType=Application\nName=Market Sync\n"
                                 "Hidden=true\n")
                 else:
                     try:

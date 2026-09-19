@@ -1,15 +1,24 @@
-# CHANGES + Design Log — Session Sync
+# CHANGES + Design Log — Market Sync
 
 Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.1.0 — 2026-09-19 — renamed to Market Sync
+- Full rename to match the repository: app name "Session Sync" → **Market Sync**;
+  package, launcher and paths `session-sync` → `market-sync`
+  (`/opt/market-sync`, `/usr/bin/market-sync`, `~/.config/market-sync`,
+  `~/.cache/market-sync`, `market-sync.desktop` entries, icon file names).
+- Settings auto-migrate from `~/.config/session-sync/settings.json` on first run.
+- Note: v1.0.0 was published under the old name. If that .deb is installed,
+  remove it once with `sudo apt remove session-sync` before installing 1.1.0.
+
 ### v1.0.0 — 2026-09-19 — distributable release
 - **Packaging**: proper `.deb` (`build-deb.sh`), one-line installer (`install.sh`),
   GitHub Actions release workflow (`.github/workflows/release.yml`).
-  - installs to `/opt/session-sync`, launcher `/usr/bin/session-sync`
+  - installs to `/opt/market-sync`, launcher `/usr/bin/market-sync`
   - crash-resilient launcher (restarts up to 3×), detaches from terminals
-  - `/etc/xdg/autostart/session-sync.desktop` → silent tray start at login
+  - `/etc/xdg/autostart/market-sync.desktop` → silent tray start at login
     for all users; per-user `Hidden=true` override for the in-app toggle
   - icons rendered to 8 PNG sizes + scalable SVG (`tools/render_icons.py`)
 - **Auto-update** (`updater.py`): checks GitHub Releases (24 h cache), tray
@@ -18,7 +27,7 @@ Tracking file for code changes, install fixes, and how the app works.
   per-theme accent threaded through stylesheet + ring timer.
 - **Fixes**: autostart no longer leaks `--hidden` into saved settings;
   `QCursor` imported at module level; dead imports removed; app logs to
-  `~/.cache/session-sync/app.log` with 1 MB rotation; single-instance guard
+  `~/.cache/market-sync/app.log` with 1 MB rotation; single-instance guard
   retries during updater relaunch; tray icon cached (no 1 s pixmap churn).
 - **Install discovery**: an older copy of this app at
   `antigravity/code/trade_box/market-coundown&news` was auto-starting at login
@@ -27,12 +36,12 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ### v0.1.0 — 2026-09-18 — initial build
 - `main.py` — entry: tray GUI (`run_gui`) + CLI fallback (`run_cli --cli --news --once`)
-- `config.py` — 5 markets (SYDNEY, TOKYO, LONDON, NEW_YORK, NYSE), `settings.json` in `~/.config/session-sync/`
+- `config.py` — 5 markets (SYDNEY, TOKYO, LONDON, NEW_YORK, NYSE), `settings.json` in `~/.config/market-sync/`
 - `markets.py` — stdlib-only DST engine (`zoneinfo`), NYSE holidays + half-days, countdown + progress
-- `calendar_api.py` — ForexFactory feed (`ff_calendar_thisweek.json`), `~/.cache/session-sync/` TTL 15 min, impact filter
+- `calendar_api.py` — ForexFactory feed (`ff_calendar_thisweek.json`), `~/.cache/market-sync/` TTL 15 min, impact filter
 - `ui.py` — PyQt6 tray (text icon `SYM HH:MM:SS`) + 344px panel (ring, hero, markets, news, footer)
 - `notifier.py` — `plyer` → `notify-send` fallback, `AlertTracker` dedup
-- `install.sh` + `autostart/session-sync.desktop` + `requirements.txt` + `README.md`
+- `install.sh` + `autostart/market-sync.desktop` + `requirements.txt` + `README.md`
 
 ### 2026-09-18 — install investigation (from `new-session---2026-09-18t02-39-03-913z.json`)
 Found failures:
@@ -48,8 +57,8 @@ Found failures:
 
 Modules: `config` (defs + settings) → `markets` (time engine) + `calendar_api` (news) → `main` (CLI/GUI router) → `ui` (tray+panel) → `notifier` (alerts).
 
-Settings: `~/.config/session-sync/settings.json` — `selected_market`, `time_mode`, `currencies`, `min_impact`, `alerts_enabled`, `alert_minutes_before`, `news_refresh_minutes`, `theme`, `show_*`.
-Cache: `~/.cache/session-sync/calendar.json`.
+Settings: `~/.config/market-sync/settings.json` — `selected_market`, `time_mode`, `currencies`, `min_impact`, `alerts_enabled`, `alert_minutes_before`, `news_refresh_minutes`, `theme`, `show_*`.
+Cache: `~/.cache/market-sync/calendar.json`.
 
 Market engine (`markets.py`):
 - Local open/close per market in IANA tz (`Australia/Sydney 07:00-16:00`, `Asia/Tokyo 09:00-18:00`, `Europe/London 08:00-16:30`, `America/New_York 08:00-17:00 FX`, `NYSE 09:30-16:00`).
@@ -78,14 +87,14 @@ flowchart TD
     D --> E
     D --> F
     E --> G[config: MARKETS + settings.json]
-    F --> H[cache ~/.cache/session-sync/calendar.json<br/>or live ff_calendar_thisweek.json]
+    F --> H[cache ~/.cache/market-sync/calendar.json<br/>or live ff_calendar_thisweek.json]
     D --> I[tick every 1s]
     I --> J[tray_label_text + make_tray_icon]
     I --> K[panel.render: ring + hero + markets + news]
     I --> L[notifier: plyer / notify-send<br/>AlertTracker dedup]
     M[install.sh] --> N[apt: python3-pyqt6 + requests + notify-bin]
     M --> O[pip extras --break-system-packages]
-    M --> P[autostart ~/.config/autostart/session-sync.desktop]
+    M --> P[autostart ~/.config/autostart/market-sync.desktop]
 ```
 
 ## File map
@@ -94,7 +103,7 @@ flowchart TD
 main.py          entry (tray + --cli fallback + --hidden + --check-update)
 config.py        market defs + settings + install/autostart paths + repo constants
 markets.py       DST-aware engine + NYSE holidays (stdlib only)
-calendar_api.py  ForexFactory feed + ~/.cache/session-sync cache
+calendar_api.py  ForexFactory feed + ~/.cache/market-sync cache
 ui.py            PyQt6 tray + panel + 6 themes + update UI
 updater.py       GitHub release check + deb download + pkexec install
 notifier.py      notify-send / plyer alerts

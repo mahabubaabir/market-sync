@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Render session-sync icon PNGs for the .deb (pure PyQt6 — no SVG tools needed).
+"""Render market-sync icon PNGs for the .deb (pure PyQt6 — no SVG tools needed).
 
 Usage: QT_QPA_PLATFORM=offscreen python3 tools/render_icons.py <hicolor-root>
-Writes <hicolor-root>/<size>x<size>/apps/session-sync.png for common sizes.
+Writes <hicolor-root>/<size>x<size>/apps/market-sync.png for common sizes.
 """
 from __future__ import annotations
 import os
@@ -67,7 +67,7 @@ def main() -> int:
         out_dir = os.path.join(root, f"{size}x{size}", "apps")
         os.makedirs(out_dir, exist_ok=True)
         img = draw(size)
-        path = os.path.join(out_dir, "session-sync.png")
+        path = os.path.join(out_dir, "market-sync.png")
         if not img.save(path, "PNG"):
             print(f"failed to save {path}", file=sys.stderr)
             return 1

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Session Sync — one-line installer for Linux Mint / Ubuntu (and derivatives).
+# Market Sync — one-line installer for Linux Mint / Ubuntu (and derivatives).
 #
 #   curl -sL https://raw.githubusercontent.com/mahabubaabir/market-sync/main/install.sh | sudo bash
 #
@@ -8,10 +8,10 @@
 set -e
 
 REPO="mahabubaabir/market-sync"
-APP="session-sync"
+APP="market-sync"
 TMP="/tmp/${APP}-install.deb"
 
-echo "== Session Sync installer =="
+echo "== Market Sync installer =="
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "This installer needs root. Run:" >&2
@@ -73,10 +73,10 @@ apt-get install -y "$TMP"
 rm -f "$TMP"
 
 echo ""
-echo "✓ Session Sync installed."
+echo "✓ Market Sync installed."
 echo ""
-echo "  Launch now:        session-sync"
-echo "  Menu:              press Super, search \"Session Sync\""
+echo "  Launch now:        market-sync"
+echo "  Menu:              press Super, search \"Market Sync\""
 echo "  It also starts automatically (silent, in tray) on your next login."
 echo "  Quit:              tray icon → right-click → Quit  (or panel → Quit app)"
-echo "  Uninstall:         sudo apt remove session-sync"
+echo "  Uninstall:         sudo apt remove market-sync"

@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Session Sync
+Name=Market Sync
 Comment=Market countdown + news for your panel (dev checkout)
 Exec=/usr/bin/python3 __HERE__/main.py --hidden
 Path=__HERE__

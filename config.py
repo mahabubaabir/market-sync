@@ -1,13 +1,13 @@
-# Session Sync — core configuration
+# Market Sync — core configuration
 """Market definitions + user settings. DST-aware via IANA timezones."""
 from __future__ import annotations
 import json
 import os
 from copy import deepcopy
 
-APP_NAME = "Session Sync"
-APP_ID = "session-sync"
-APP_VERSION = "1.0.0"
+APP_NAME = "Market Sync"
+APP_ID = "market-sync"
+APP_VERSION = "1.1.0"
 
 # GitHub repo used by the one-line installer + auto-update checker.
 # Change these two lines if you fork / rename the project.
@@ -16,7 +16,7 @@ UPDATE_CHECK_HOURS = 24
 
 # Where the app lives when installed from the .deb. Falls back to the source
 # checkout directory when running in development.
-SYSTEM_INSTALL_DIR = "/opt/session-sync"
+SYSTEM_INSTALL_DIR = "/opt/market-sync"
 
 
 def app_dir() -> str:
@@ -127,7 +127,7 @@ LOCK_PATH = os.path.join(CACHE_DIR, "app.lock")
 LOG_PATH = os.path.join(CACHE_DIR, "app.log")
 
 # System-wide autostart entry (installed by the .deb, applies to all users).
-SYSTEM_AUTOSTART_PATH = "/etc/xdg/autostart/session-sync.desktop"
+SYSTEM_AUTOSTART_PATH = "/etc/xdg/autostart/market-sync.desktop"
 # Per-user override (XDG spec: a user file with Hidden=true disables the system
 # entry; a normal user file or its absence leaves the system entry active).
 USER_AUTOSTART_PATH = os.path.join(
@@ -136,7 +136,7 @@ USER_AUTOSTART_PATH = os.path.join(
 # Back-compat alias for code that referenced the old name.
 AUTOSTART_PATH = USER_AUTOSTART_PATH
 
-LAUNCHER_PATH = "/usr/bin/session-sync"
+LAUNCHER_PATH = "/usr/bin/market-sync"
 
 
 def get_market(market_id: str) -> dict:
@@ -146,7 +146,23 @@ def get_market(market_id: str) -> dict:
     return MARKETS[2]
 
 
+def _migrate_old_config() -> None:
+    """One-time: carry settings over from the pre-1.1 'session-sync' name."""
+    old_dir = os.path.join(os.path.expanduser("~"), ".config", "session-sync")
+    old_path = os.path.join(old_dir, "settings.json")
+    try:
+        if os.path.exists(SETTINGS_PATH) or not os.path.exists(old_path):
+            return
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        with open(old_path, "r", encoding="utf-8") as src, \
+                open(SETTINGS_PATH, "w", encoding="utf-8") as dst:
+            dst.write(src.read())
+    except Exception:
+        pass
+
+
 def load_settings() -> dict:
+    _migrate_old_config()
     settings = deepcopy(DEFAULT_SETTINGS)
     try:
         if os.path.exists(SETTINGS_PATH):

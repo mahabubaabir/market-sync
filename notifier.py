@@ -7,7 +7,7 @@ import subprocess
 def _via_notify_send(title: str, message: str) -> bool:
     if shutil.which("notify-send"):
         try:
-            subprocess.Popen(["notify-send", "-a", "Session Sync", title, message])
+            subprocess.Popen(["notify-send", "-a", "Market Sync", title, message])
             return True
         except Exception:
             return False
@@ -17,7 +17,7 @@ def _via_notify_send(title: str, message: str) -> bool:
 def notify(title: str, message: str) -> None:
     try:
         from plyer import notification  # type: ignore
-        notification.notify(title=title, message=message, app_name="Session Sync", timeout=8)
+        notification.notify(title=title, message=message, app_name="Market Sync", timeout=8)
         return
     except Exception:
         pass

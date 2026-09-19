@@ -1,5 +1,5 @@
 #!/bin/bash
-# Session Sync post-install: refresh desktop + icon caches.
+# Market Sync post-install: refresh desktop + icon caches.
 set -e
 if [ "$1" = "configure" ]; then
   if command -v update-desktop-database >/dev/null 2>&1; then

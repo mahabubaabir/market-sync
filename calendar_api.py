@@ -1,7 +1,7 @@
 """Free economic-calendar feed (ForexFactory via FairEconomy, no API key).
 
 Feed: https://nfs.faireconomy.media/ff_calendar_thisweek.json
-Cache: ~/.cache/session-sync/calendar.json (TTL 15 min default)
+Cache: ~/.cache/market-sync/calendar.json (TTL 15 min default)
 """
 from __future__ import annotations
 import json
@@ -14,7 +14,7 @@ try:
 except ImportError:
     HAS_REQUESTS = False
 
-APP_ID = "session-sync"
+APP_ID = "market-sync"
 FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", APP_ID)
 CACHE_PATH = os.path.join(CACHE_DIR, "calendar.json")
@@ -97,7 +97,7 @@ def fetch_events(force_refresh: bool = False, cache_ttl_min: int = 15) -> tuple[
         note = "requests not installed — using cache" if cached else "requests not installed"
         return cached, True, note
     try:
-        r = requests.get(FF_URL, timeout=15, headers={"User-Agent": "session-sync/0.1"})
+        r = requests.get(FF_URL, timeout=15, headers={"User-Agent": "market-sync/0.1"})
         r.raise_for_status()
         raw = r.json()
         events = [e for e in (_normalize(x) for x in raw) if e]

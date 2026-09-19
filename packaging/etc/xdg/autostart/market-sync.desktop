@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Session Sync
+Name=Market Sync
 Comment=Market countdown + news (starts in tray)
-Exec=session-sync --hidden
-Icon=session-sync
+Exec=market-sync --hidden
+Icon=market-sync
 Terminal=false
 Categories=Finance;Office;
 X-GNOME-Autostart-enabled=true

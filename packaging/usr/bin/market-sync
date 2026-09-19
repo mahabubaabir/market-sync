@@ -1,9 +1,9 @@
 #!/bin/bash
-# Session Sync launcher (installed as /usr/bin/session-sync).
+# Market Sync launcher (installed as /usr/bin/market-sync).
 # - Detaches from the terminal so closing it never kills the app.
 # - Restarts after a crash (up to 3 times); clean quit ends the loop.
-APP_DIR="/opt/session-sync"
-LOG_DIR="$HOME/.cache/session-sync"
+APP_DIR="/opt/market-sync"
+LOG_DIR="$HOME/.cache/market-sync"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOG="$LOG_DIR/app.log"
 
@@ -29,9 +29,9 @@ run_loop() {
 
 # Launching from a terminal? Detach so the app survives the terminal closing.
 if [ -t 2 ]; then
-  setsid /usr/bin/session-sync "$@" >/dev/null 2>&1 < /dev/null &
+  setsid /usr/bin/market-sync "$@" >/dev/null 2>&1 < /dev/null &
   disown 2>/dev/null || true
-  echo "Session Sync started in the background (log: $LOG)"
+  echo "Market Sync started in the background (log: $LOG)"
   exit 0
 fi
 

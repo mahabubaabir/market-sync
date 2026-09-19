@@ -1,10 +1,10 @@
 #!/bin/bash
-# Session Sync — build a .deb with one command: ./build-deb.sh
-# Output: dist/session-sync_<version>_all.deb
+# Market Sync — build a .deb with one command: ./build-deb.sh
+# Output: dist/market-sync_<version>_all.deb
 set -e
 cd "$(dirname "$0")"
 
-APP="session-sync"
+APP="market-sync"
 VERSION="$(python3 -c 'import config; print(config.APP_VERSION)')"
 ARCH="all"
 
@@ -34,7 +34,7 @@ install -m 0644 assets/icon.svg "$BUILD/usr/share/icons/hicolor/scalable/apps/$A
 QT_QPA_PLATFORM=offscreen python3 tools/render_icons.py "$BUILD/usr/share/icons/hicolor" >/dev/null
 
 # --- launcher + desktop entries
-install -m 0755 packaging/usr/bin/session-sync "$BUILD/usr/bin/$APP"
+install -m 0755 packaging/usr/bin/market-sync "$BUILD/usr/bin/$APP"
 install -m 0644 "packaging/usr/share/applications/$APP.desktop" "$BUILD/usr/share/applications/"
 install -m 0644 "packaging/etc/xdg/autostart/$APP.desktop" "$BUILD/etc/xdg/autostart/"
 

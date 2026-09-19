@@ -2,7 +2,7 @@
 
 Design rules:
  - Never raises, never blocks the UI thread (callers use threads).
- - Result cached in ~/.cache/session-sync/update.json for UPDATE_CHECK_HOURS.
+ - Result cached in ~/.cache/market-sync/update.json for UPDATE_CHECK_HOURS.
  - Install uses `pkexec apt-get install` for a GUI password prompt.
 """
 from __future__ import annotations
@@ -16,7 +16,7 @@ from config import APP_VERSION, GITHUB_REPO, UPDATE_CHECK_HOURS, CACHE_DIR
 
 CACHE_PATH = os.path.join(CACHE_DIR, "update.json")
 API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-UA = f"session-sync/{APP_VERSION} (Linux Mint; +https://github.com/{GITHUB_REPO})"
+UA = f"market-sync/{APP_VERSION} (Linux Mint; +https://github.com/{GITHUB_REPO})"
 
 
 def _version_tuple(tag: str) -> tuple:
