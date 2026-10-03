@@ -7,7 +7,7 @@ from copy import deepcopy
 
 APP_NAME = "Market Sync"
 APP_ID = "market-sync"
-APP_VERSION = "1.4.2"
+APP_VERSION = "1.4.3"
 APP_AUTHOR = "Mahabub H. Aabir"
 APP_EMAIL = "maha_bub@outlook.com"
 
@@ -125,7 +125,10 @@ DEFAULT_SETTINGS = {
     "news_drawer_expanded": True,
     # Tray + top panel presentation (v0.2 parity)
     "tray_mode": "multi",           # multi (open + next) | single (selected market)
-    "tray_icon_style": "text",      # text | logo
+    # "logo" matches the design system / README recommendation: Cinnamon's tray
+    # squeezes wide text pixmaps into a blank-looking slot. Switch to "text"
+    # from Preferences → Tray icon if you prefer the live session strip.
+    "tray_icon_style": "logo",      # logo | text
     "tray_layout": "compact",       # compact (symbols) | standard (names)
     "tray_time_as": "countdown",    # countdown | local_time
     "tray_sessions": "active_and_next",  # active_only | active_and_next | all

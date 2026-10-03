@@ -1,18 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Market Sync — two bold folded arrows chasing each other round the ring.
+       Tuned for 16px: 28-unit thick bands, blunt heads (sharp tips alias away
+       at tray size), 42-degree gaps so both arrows stay readable as separate
+       shapes, and a soft dark keyline that keeps it visible on light panels. -->
   <defs>
-    <linearGradient id="syncGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="arrowA" gradientUnits="userSpaceOnUse" x1="18" y1="82" x2="62" y2="18">
       <stop offset="0%" stop-color="#67e8f9"/>
-      <stop offset="100%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#818cf8"/>
     </linearGradient>
-    <linearGradient id="syncGrad2" x1="100%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" stop-color="#34d399"/>
-      <stop offset="100%" stop-color="#22d3ee"/>
+    <linearGradient id="arrowB" gradientUnits="userSpaceOnUse" x1="82" y1="18" x2="38" y2="82">
+      <stop offset="0%" stop-color="#6ee7b7"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
     </linearGradient>
   </defs>
 
-  <!-- Two opposing market arrows meet at the synchronization point. -->
-  <path d="M50 9 A41 41 0 0 1 91 50 A41 41 0 0 1 80 78 L68 66 A24 24 0 0 0 74 50 A24 24 0 0 0 50 26 L50 38 L28 19 L50 0 Z" fill="url(#syncGrad1)"/>
-  <path d="M50 91 A41 41 0 0 1 9 50 A41 41 0 0 1 20 22 L32 34 A24 24 0 0 0 26 50 A24 24 0 0 0 50 74 L50 62 L72 81 L50 100 Z" fill="url(#syncGrad2)"/>
-  <circle cx="50" cy="50" r="7" fill="#ffffff"/>
-  <circle cx="50" cy="50" r="4" fill="#38bdf8"/>
+  <!-- Upper arrow: cyan -> indigo -->
+  <path d="M 28.66 8.12 A 47 47 0 0 0 19.17 85.47 L 36.02 86.41 L 40.32 75.21 L 37.53 64.34 A 19 19 0 0 1 45.08 31.65 Z"
+        fill="url(#arrowA)" stroke="#0b1220" stroke-opacity="0.22" stroke-width="3" stroke-linejoin="round"/>
+
+  <!-- Lower arrow (180 degrees opposite): emerald -> sky -->
+  <path d="M 71.34 91.88 A 47 47 0 0 0 80.83 14.53 L 63.98 13.59 L 59.68 24.79 L 62.47 35.66 A 19 19 0 0 1 54.92 68.35 Z"
+        fill="url(#arrowB)" stroke="#0b1220" stroke-opacity="0.22" stroke-width="3" stroke-linejoin="round"/>
 </svg>

@@ -13,7 +13,7 @@ import time
 import signal
 from datetime import datetime, timezone
 
-from config import APP_NAME, APP_VERSION, MARKETS, get_market, load_settings, save_settings, app_dir
+from config import APP_NAME, APP_VERSION, MARKETS, load_settings, save_settings, app_dir
 import markets as engine
 import calendar_api
 
@@ -212,6 +212,17 @@ def main() -> int:
         return run_gui(args)
     if args.cli or args.once:
         return run_cli(args)
+
+    # Plain launch (menu entry, launcher, terminal) while the background daemon
+    # is already running. Previously this hit the single-instance lock and
+    # exited silently, so clicking "Market Sync" in the menu appeared to do
+    # nothing. Hand the request to the running instance instead.
+    if args.market:
+        if _send_ipc(f"market:{args.market}"):
+            _send_ipc("show")
+            return 0
+    elif _send_ipc("show"):
+        return 0
     return run_gui(args)
 
 

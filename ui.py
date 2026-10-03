@@ -21,14 +21,13 @@ try:
         QApplication, QWidget, QSystemTrayIcon, QMenu,
         QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea,
         QFrame, QCheckBox, QGridLayout, QDialog, QComboBox, QButtonGroup,
-        QSizePolicy,
     )
     from PyQt6.QtGui import (
         QIcon, QPixmap, QPainter, QColor, QFont, QAction, QActionGroup,
         QFontMetrics, QPen, QCursor,
     )
     from PyQt6.QtCore import QTimer, Qt, QRectF, QEvent, pyqtSignal
-    from PyQt6.QtNetwork import QLocalServer, QLocalSocket
+    from PyQt6.QtNetwork import QLocalServer
     HAS_QT = True
 except ImportError:
     HAS_QT = False
@@ -388,12 +387,16 @@ def _panel_markup(statuses, settings, now_utc) -> tuple[str, str, bool]:
     if not toks:
         toks = [token(s) for s in statuses[:1]]
     plain = "  ".join(f"{sym} {val}" for sym, val, _ in toks)
+    # Theme tokens, not literals: hard-coded dark-theme green/silver rendered
+    # almost invisible on a light Cinnamon panel.
+    t = THEMES[resolve_theme(settings.get("theme", "system"))]
+    open_col, closed_col = t["green"], t["closed"]
     parts = []
     for sym, val, op in toks:
         if op:
-            parts.append(f'<span weight="bold" foreground="#30d158">● {sym} {val}</span>')
+            parts.append(f'<span weight="bold" foreground="{open_col}">● {sym} {val}</span>')
         else:
-            parts.append(f'<span foreground="#cbd5e1">○ {sym} {val}</span>')
+            parts.append(f'<span foreground="{closed_col}">○ {sym} {val}</span>')
     markup = "  ".join(parts)
     any_open = any(s["is_open"] for s in statuses)
     return plain, markup, any_open
@@ -512,6 +515,13 @@ def make_tray_logo_icon(any_open: bool, size: int = 24) -> "QIcon":
     p.drawEllipse(size - 9, size - 9, 7, 7)
     p.end()
     return QIcon(pm)
+
+
+def _empty_text(note: str | None) -> str:
+    """Placeholder shown while the news drawer has no rows."""
+    if not note or note.startswith(("news:", "live", "cache")):
+        return "No upcoming economic events"
+    return note
 
 
 def _next_nyse_holiday_line(now_utc=None) -> str:
@@ -899,7 +909,7 @@ if HAS_QT:
             self.chip_all.blockSignals(False)
 
         # -- content
-        def update_events(self, shown: list, now_utc):
+        def update_events(self, shown: list, now_utc, note: str | None = None):
             t = THEMES[self.c.panel._theme]
             name = self.c.panel._theme
             self.date_label.setText(
@@ -918,7 +928,7 @@ if HAS_QT:
                         w.deleteLater()
                 self._rows = []
                 if not shown:
-                    lab = QLabel("No upcoming economic events")
+                    lab = QLabel(_empty_text(note))
                     lab.setStyleSheet(f"color: {t['muted']}; font-size: 11px;")
                     lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
                     self.rows_layout.insertWidget(0, lab)
@@ -932,6 +942,12 @@ if HAS_QT:
                 for row, e in zip(self._rows, shown):
                     if hasattr(row, "update_data"):
                         row.update_data(e, t, name, now_utc)
+            # Fetching state changes even when the row list does not — keep the
+            # empty-state text honest instead of silently showing "No events".
+            if not shown and self._rows and isinstance(self._rows[0], QLabel):
+                txt = _empty_text(note)
+                if self._rows[0].text() != txt:
+                    self._rows[0].setText(txt)
 else:
     class UpNextDrawer:  # type: ignore
         def __init__(self, *a, **k):
@@ -1138,7 +1154,7 @@ class SessionPanel(QWidget):
         shown = calendar_api.filter_events(
             news, self.c.settings["currencies"], None, 72, now_utc,
             active_impacts=active)
-        self.drawer.update_events(shown[:16], now_utc)
+        self.drawer.update_events(shown[:16], now_utc, news_note)
 
 
 if HAS_QT:
@@ -1213,6 +1229,16 @@ if HAS_QT:
                 [("active_only", "Active Only"), ("active_and_next", "Active + Next"),
                  ("all", "All")], s.get("tray_sessions", "active_and_next"))
             row("Panel Sessions", self.seg_sessions)
+            # Previously these two lived in settings.json with no control, so
+            # the logo could only be enabled by hand-editing the file.
+            self.seg_traystyle = self._seg(
+                [("logo", "Logo + Dot"), ("text", "Session Text")],
+                s.get("tray_icon_style", "logo"), preview=False)
+            row("Tray icon", self.seg_traystyle)
+            self.seg_traymode = self._seg(
+                [("multi", "All Sessions"), ("single", "Selected Only")],
+                s.get("tray_mode", "multi"), preview=False)
+            row("Tray shows", self.seg_traymode)
 
             self.standalone_chk = QCheckBox(
                 "Show standalone tray icon alongside panel applet")
@@ -1460,6 +1486,8 @@ if HAS_QT:
             s["tray_time_as"] = self._seg_value(self.seg_timeas, "countdown")
             s["time_format"] = self._seg_value(self.seg_format, "24h")
             s["tray_sessions"] = self._seg_value(self.seg_sessions, "active_and_next")
+            s["tray_icon_style"] = self._seg_value(self.seg_traystyle, "logo")
+            s["tray_mode"] = self._seg_value(self.seg_traymode, "multi")
             s["show_standalone_tray"] = self.standalone_chk.isChecked()
             s["active_brighten"] = self.brighten_chk.isChecked()
             s["market_display"] = {
@@ -1510,10 +1538,15 @@ class TrayController:
         self._update_notified_tag: str | None = None
         self._update_status: tuple | None = None
         self._update_busy = False
+        self._update_announce = False
+        self._update_installing = False
         self._prefs: PreferencesDialog | None = None
+        self._news_busy = False
 
+        # NOTE: do not call setVisible() until an icon exists — Qt emits
+        # "QSystemTrayIcon::setVisible: No Icon set" and Cinnamon reserves an
+        # empty tray slot. tick() sets the icon; we show it at the end.
         self.tray = QSystemTrayIcon()
-        self.tray.setVisible(True)
         self.tray.activated.connect(self._on_activated)
         self.menu = QMenu()
         self._build_menu()
@@ -1559,20 +1592,44 @@ class TrayController:
 
         self.refresh_news(force=True)
         self.tick()
+        # Show the tray only once tick() has given it a real pixmap.
+        try:
+            if self.tray.icon().isNull():
+                self.tray.setIcon(make_tray_logo_icon(False))
+        except Exception:
+            pass
+        self.tray.setVisible(True)
 
     # ---------------- IPC
     def _on_ipc(self):
+        """Accept connections non-blockingly.
+
+        The old code called waitForReadyRead(400) and then read once: if the
+        bytes had not landed inside that window the applet's click was simply
+        dropped. Buffer on readyRead and dispatch once the peer disconnects.
+        """
         while self._ipc.hasPendingConnections():
             conn = self._ipc.nextPendingConnection()
+            if conn is None:
+                break
+            buf = bytearray()
+            conn.readyRead.connect(
+                lambda _=False, c=conn, b=buf: b.extend(c.readAll()))
+            conn.disconnected.connect(
+                lambda _=False, c=conn, b=buf: self._dispatch_ipc(bytes(b), c))
+
+    def _dispatch_ipc(self, data: bytes, conn) -> None:
+        try:
+            cmd = data.decode("utf-8", "ignore").strip().lower()
+            if cmd:
+                self._handle_ipc_command(cmd)
+        except Exception:
+            pass
+        finally:
             try:
-                if conn.waitForReadyRead(400):
-                    cmd = bytes(conn.readAll()).decode("utf-8", "ignore").strip().lower()
-                    self._handle_ipc_command(cmd)
-            finally:
-                try:
-                    conn.disconnectFromServer()
-                except Exception:
-                    pass
+                conn.deleteLater()
+            except Exception:
+                pass
 
     def _handle_ipc_command(self, cmd: str):
         if cmd in ("toggle", "--toggle"):
@@ -1586,6 +1643,10 @@ class TrayController:
             self.open_preferences()
         elif cmd in ("quit", "--quit"):
             self.quit_app()
+        elif cmd.startswith("market:"):
+            mid = cmd.split(":", 1)[1].strip().upper()
+            if mid in MARKET_IDS:
+                self.select_market(mid)
 
     # ---------------- applet / tray coordination
     def _detect_applet(self) -> bool:
@@ -1774,6 +1835,19 @@ class TrayController:
             self.tick()
 
     def open_preferences(self):
+        # Guard against a second request arriving while the dialog is modal
+        # (its nested event loop still delivers IPC and timer callbacks).
+        existing = getattr(self, "_prefs", None)
+        if existing is not None:
+            try:
+                existing.show()
+                existing.raise_()
+                existing.activateWindow()
+                return
+            except RuntimeError:
+                self._prefs = None
+            except Exception:
+                return
         try:
             self.panel.hide()
         except Exception:
@@ -1789,6 +1863,8 @@ class TrayController:
             dlg.exec()
         except Exception:
             pass
+        finally:
+            self._prefs = None
 
     def set_autostart_enabled(self, on: bool):
         from config import SYSTEM_AUTOSTART_PATH
@@ -1825,6 +1901,21 @@ class TrayController:
             self.tick()
 
     def refresh_news(self, force=False):
+        """Always fetch on a worker thread.
+
+        The previous version ran inline whenever the cache was empty or a
+        refresh was forced. requests.get() has a 15s timeout, so startup (and
+        every "Refresh news" click) could freeze the whole UI for seconds.
+        """
+        if self._news_busy:
+            return
+        self._news_busy = True
+        try:
+            with self._news_lock:
+                self.news_note = "fetching events…"
+        except Exception:
+            pass
+
         def _work():
             try:
                 ev, _cached, note = calendar_api.fetch_events(
@@ -1835,14 +1926,12 @@ class TrayController:
                     self.events = ev
                     self.news_note = note
             except Exception:
-                pass
+                with self._news_lock:
+                    self.news_note = "news unavailable (offline?)"
+            finally:
+                self._news_busy = False
 
-        with self._news_lock:
-            empty = not self.events
-        if empty or force:
-            _work()
-        else:
-            threading.Thread(target=_work, daemon=True).start()
+        threading.Thread(target=_work, daemon=True).start()
 
     # ---------------- auto-update plumbing
     def _check_updates(self, force: bool = False, announce: bool = False):

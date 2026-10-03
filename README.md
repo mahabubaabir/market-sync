@@ -12,7 +12,7 @@ economic calendar.
 
 ## Install (one command)
 
-Latest release: **v1.4.2** — older `.deb` releases were pruned, so always
+Latest release: **v1.4.3** — older `.deb` releases were pruned, so always
 install the newest asset from the
 [Releases page](https://github.com/mahabubaabir/market-sync/releases).
 
@@ -31,9 +31,8 @@ cd /opt/market-sync && ./install-applet.sh
 - **Top panel applet (text-only):** `● LON +04:05  ○ NYC -00:35` — bright
   green when open, silvery when closed. **Left-click opens the same panel
   as the tray icon.** Right-click: Toggle Panel / Preferences… / Quit
-- **Standalone tray:** compact twin-arrow logo with a green/grey status dot
-  (`tray_icon_style: logo` in settings is recommended — the wide `text`
-  strip can render as a blank slot in Cinnamon's tray)
+- **Standalone tray:** bold two-folded-arrow logo with a green/grey status dot
+  (default; switch to the live `text` strip under Preferences → Tray icon)
 - **IPC:** `market-sync --toggle` · `--show` · `--hide` · `--preferences` · `--quit`
 - **At login:** starts silently in the tray
 - **Quit:** tray menu, panel ✕ … or Preferences → Quit app

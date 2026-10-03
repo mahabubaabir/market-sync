@@ -32,7 +32,7 @@ def main() -> int:
         return 2
 
     from PyQt6.QtGui import QGuiApplication
-    _app = QGuiApplication([])
+    QGuiApplication([])  # required before QImage/QPainter
 
     root = sys.argv[1]
     sizes = [16, 22, 24, 32, 48, 64, 128, 256]

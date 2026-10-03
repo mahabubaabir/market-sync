@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "name": "Market Sync Design System & Technical Specification",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "specificationVersion": "2.0.0",
   "project": {
     "name": "Market Sync",
@@ -272,20 +272,37 @@
       }
     },
     "brandLogo": {
-      "concept": "Two opposing sync arrows converging on an illuminated core (transparent canvas, no squircle/clock container since v1.4.2)",
+      "concept": "Two bold folded arrows, 180 degrees apart, chasing each other round a transparent ring. Rebuilt in v1.4.3 for 16px legibility: 28-unit thick bands, blunt heads, 42-degree gaps, soft dark keyline.",
       "viewBox": "0 0 100 100",
       "files": ["assets/icon.svg", "assets/logo.svg"],
+      "smallSizeNotes": {
+        "bandThickness": 28,
+        "outerRadius": 47,
+        "innerRadius": 19,
+        "gapDegrees": 42,
+        "headTipWidth": 12,
+        "keyline": "#0b1220 @ 0.22 opacity, width 3",
+        "whyBluntHeads": "A sharp point antialiases away at 16px; a flat radial tip keeps the mass.",
+        "measured16px": {
+          "solidCoverageOld": "27.3%",
+          "solidCoverageNew": "35.2%",
+          "haloOld": "18.0%",
+          "haloNew": "14.8%"
+        }
+      },
       "upperArrow": {
-        "gradientId": "syncGrad1",
+        "gradientId": "arrowA",
+        "gradientUnits": "userSpaceOnUse",
         "startColor": "#67e8f9",
-        "endColor": "#6366f1",
-        "path": "M50 9 A41 41 0 0 1 91 50 A41 41 0 0 1 80 78 L68 66 A24 24 0 0 0 74 50 A24 24 0 0 0 50 26 L50 38 L28 19 L50 0 Z"
+        "endColor": "#818cf8",
+        "path": "M 28.66 8.12 A 47 47 0 0 0 19.17 85.47 L 36.02 86.41 L 40.32 75.21 L 37.53 64.34 A 19 19 0 0 1 45.08 31.65 Z"
       },
       "lowerArrow": {
-        "gradientId": "syncGrad2",
-        "startColor": "#34d399",
-        "endColor": "#22d3ee",
-        "path": "M50 91 A41 41 0 0 1 9 50 A41 41 0 0 1 20 22 L32 34 A24 24 0 0 0 26 50 A24 24 0 0 0 50 74 L50 62 L72 81 L50 100 Z"
+        "gradientId": "arrowB",
+        "gradientUnits": "userSpaceOnUse",
+        "startColor": "#6ee7b7",
+        "endColor": "#38bdf8",
+        "path": "M 71.34 91.88 A 47 47 0 0 0 80.83 14.53 L 63.98 13.59 L 59.68 24.79 L 62.47 35.66 A 19 19 0 0 1 54.92 68.35 Z"
       },
       "centerCore": {
         "outerCircle": "cx=50 cy=50 r=7 fill=#ffffff",

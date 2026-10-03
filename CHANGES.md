@@ -4,6 +4,72 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.4.3 — 2026-10-03 — Bold logo + launch/news/tray fixes
+
+**Logo (bold two-folded-arrow mark)**
+- Rebuilt `assets/icon.svg` for tray size. The old mark used two thin 17-unit
+  arcs with separate triangular heads that antialiased into mush at 16px.
+  New geometry: 28-unit thick bands (`R=47, r=19`), **blunt** heads (a sharp
+  point loses most of its pixels at 16px), 42° gaps so both arrows stay
+  readable as two distinct shapes, and a soft dark keyline so it survives
+  light panels as well as dark.
+  - Measured @16px: solid coverage 27.3% → **35.2%**, antialias halo
+    18.0% → **14.8%**, contrast vs dark panel **+37%**, vs light panel **+14%**
+  - Verified programmatically: no viewBox clipping, 180° rotational symmetry,
+    exactly two connected blobs at every size
+- `assets/logo.svg` keeps the illuminated center core + glow (brand/docs use)
+- Regenerated `cinnamon-applet/*/icon.svg` + 128px `icon.png` from the same
+  source, so the catalog art matches the app icon
+
+**Launch bug — clicking "Market Sync" in the menu did nothing**
+- The app autostarts silently at login, so on a plain launch the
+  single-instance lock was always already held: `main.py` printed
+  "Market Sync is already running" to stderr (invisible with `Terminal=false`)
+  and exited. The user saw no window appear at all.
+- A plain launch now forwards `show` over IPC to the running daemon first, and
+  only starts a new instance when nothing answers. `--market X` forwards
+  `market:X` the same way. Verified: menu click now opens the panel
+  (0 → 1 window) where the old code opened nothing.
+
+**Startup / UI freeze**
+- `TrayController.refresh_news()` ran `requests.get()` **inline** whenever the
+  cache was empty or a refresh was forced — i.e. on every startup and on every
+  "Refresh news" click. With the 15s timeout that froze the whole UI.
+  Measured: 5.13s blocked → **0.01s** with a hanging network.
+- Now always on a worker thread, guarded against overlapping fetches, and the
+  drawer reports `fetching events…` / `news unavailable (offline?)` instead of
+  silently showing "No upcoming economic events".
+
+**Tray icon**
+- `QSystemTrayIcon.setVisible(True)` ran before any icon existed, so Qt warned
+  `QSystemTrayIcon::setVisible: No Icon set` (3×) and Cinnamon reserved an
+  empty slot. The tray is now shown only after `tick()` sets a real pixmap.
+- `tray_icon_style` and `tray_mode` existed in `settings.json` but had **no UI
+  control**, so the logo could only be enabled by hand-editing the file.
+  Preferences now has **Tray icon** (Logo + Dot / Session Text) and
+  **Tray shows** (All Sessions / Selected Only).
+- `tray_icon_style` now defaults to `logo`, matching what the design system
+  and README already recommended (Cinnamon's tray squeezes wide text pixmaps
+  into a blank-looking slot).
+
+**Cinnamon applet**
+- `panel_status.json` markup hard-coded the dark-theme green (`#30d158`) and
+  silver (`#cbd5e1`). On a light panel the silver was essentially invisible.
+  Both now come from the active theme's tokens.
+
+**IPC**
+- `_on_ipc` used `waitForReadyRead(400)` + a single `readAll()`. Bytes that
+  arrived outside that window were dropped, so applet clicks could silently do
+  nothing. Now buffers on `readyRead` and dispatches on `disconnected`.
+- Added a `market:<ID>` command; guarded Preferences against being opened twice
+  (its nested event loop still delivers IPC/timer callbacks).
+
+**Housekeeping**
+- Removed dead code flagged by pyflakes (unused imports/locals in `main.py`,
+  `ui.py`, `markets.py`, `tools/render_icons.py`); initialized
+  `_update_announce` / `_update_installing` / `_news_busy` in `__init__`
+  instead of relying on `getattr` defaults.
+
 ### v1.4.0 — 2026-09-19 — Design System v2.0 + Cinnamon applet (both-in-one)
 Implements `System_Design/DESIGN_SYSTEM.md` (spec v2.0.0):
 - **Panel shell fixed** — the glass window is now a `QFrame#PanelRoot` inside a

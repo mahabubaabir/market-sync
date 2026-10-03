@@ -115,21 +115,39 @@ Each financial hub is represented by a dedicated vector landmark icon rendered i
 The official Market Sync emblem represents global financial liquidity and time synchronicity.
 
 ```
-          ▲
-        /   \       Upper Arrow: Cyan -> Indigo (#67e8f9 to #6366f1)
-      │       │
-      │   ●   │     Core: white convergence point (r=7) with cyan pupil (r=4, #38bdf8)
-      │       │
-        \   /       Lower Arrow: Emerald -> Cyan (#34d399 to #22d3ee)
-          ▼
+      ╭───────╮        Two folded arrows, 180 degrees apart, chasing each
+    ╭─╯       ╰─╮      other round the ring. Tuned for 16px legibility.
+    │           │
+   ◄─           ─►    Upper arrow: Cyan -> Indigo (#67e8f9 -> #818cf8)
+    │           │     Lower arrow: Emerald -> Sky (#6ee7b7 -> #38bdf8)
+    ╰─╮       ╭─╯
+      ╰───────╯
 ```
 
+### Bold variant (v1.4.3)
+
+The pre-1.4.3 mark used two thin arcs (17 units) whose separate triangular
+heads antialiased into mush at 16px. The current mark is rebuilt for tray size:
+
+- **Band thickness 28 units** (`R=47, r=19`) — ~4.5px of solid stroke at 16px.
+- **Blunt heads**: the tip is a flat radial edge 12 units wide. A sharp point
+  loses >90% of its pixels to antialiasing at 16px, so the mass is preserved.
+- **42° gaps** between the arrows so both stay readable as two distinct shapes
+  (verified: exactly two connected blobs at every rendered size).
+- **Soft keyline** (`#0b1220` @ 22%, width 3) so the mark survives light panels
+  as well as dark ones.
+
+Measured at 16px vs the v1.4.2 mark: solid pixel coverage 27.3% → 35.2%,
+antialias halo 18.0% → 14.8%, contrast vs a dark panel +37%, vs a light
+panel +14%.
+
 ### SVG Path Structure (`assets/icon.svg`, `assets/logo.svg`)
-- **Canvas**: transparent `100x100` — no squircle/clock container (removed in v1.4.2). Two opposing sync arrows meet at the center core.
-- **Upper Arrow**: `M50 9 A41 41 0 0 1 91 50 A41 41 0 0 1 80 78 L68 66 A24 24 0 0 0 74 50 A24 24 0 0 0 50 26 L50 38 L28 19 L50 0 Z` (gradient `syncGrad1`: `#67e8f9` → `#6366f1`)
-- **Lower Arrow**: `M50 91 A41 41 0 0 1 9 50 A41 41 0 0 1 20 22 L32 34 A24 24 0 0 0 26 50 A24 24 0 0 0 50 74 L50 62 L72 81 L50 100 Z` (gradient `syncGrad2`: `#34d399` → `#22d3ee`)
-- **Center Core**: white circle (`r=7`) with cyan pupil (`r=4`, fill `#38bdf8`).
-- **Packaging**: `tools/render_icons.py` renders `assets/icon.svg` into all hicolor PNG sizes; no hand-drawn clock fallback remains.
+- **Canvas**: transparent `100x100` — no squircle/clock container (removed in v1.4.2).
+- **Upper Arrow**: `M 28.66 8.12 A 47 47 0 0 0 19.17 85.47 L 36.02 86.41 L 40.32 75.21 L 37.53 64.34 A 19 19 0 0 1 45.08 31.65 Z` (gradient `arrowA`: `#67e8f9` → `#818cf8`)
+- **Lower Arrow**: `M 71.34 91.88 A 47 47 0 0 0 80.83 14.53 L 63.98 13.59 L 59.68 24.79 L 62.47 35.66 A 19 19 0 0 1 54.92 68.35 Z` (gradient `arrowB`: `#6ee7b7` → `#38bdf8`)
+- **Gradients use `gradientUnits="userSpaceOnUse"`** so the head and band share one continuous ramp (no seam where they meet).
+- **`assets/logo.svg` only**: adds the illuminated convergence core (white `r=6.5` with cyan pupil `r=3.5`) plus a Gaussian glow — for docs/README at large sizes. `assets/icon.svg` omits it so the tray silhouette stays clean.
+- **Packaging**: `tools/render_icons.py` renders `assets/icon.svg` into all hicolor PNG sizes; `cinnamon-applet/*/icon.png` (128px catalog art) is generated from the same source.
 
 ---
 

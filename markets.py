@@ -6,7 +6,7 @@ NYSE holidays are computed locally (no pandas needed).
 from __future__ import annotations
 from datetime import datetime, timedelta, timezone, time as dtime
 from zoneinfo import ZoneInfo
-from config import MARKETS, get_market
+from config import MARKETS
 
 
 # ---------------------------------------------------------------- holidays
@@ -55,7 +55,6 @@ def _nth_weekday(year: int, month: int, weekday: int, n: int) -> datetime:
 
 def nyse_holidays(year: int) -> set:
     """Return set of date objects when NYSE is fully closed."""
-    from datetime import date
     good_friday = (_easter_sunday(year) - timedelta(days=2)).date()
     fixed = [
         _observed(datetime(year, 1, 1)).date(),    # New Year's
@@ -140,7 +139,6 @@ def market_status(market: dict, now_utc: datetime | None = None) -> dict:
     now_local = now_utc.astimezone(tz)
 
     # Find today's bounds
-    day_cursor = now_local
     if _is_trading_day(market, now_local):
         open_dt, close_dt = market_day_bounds(market, now_local)
         if open_dt <= now_local < close_dt:
