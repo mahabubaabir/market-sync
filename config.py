@@ -7,7 +7,7 @@ from copy import deepcopy
 
 APP_NAME = "Market Sync"
 APP_ID = "market-sync"
-APP_VERSION = "1.4.3"
+APP_VERSION = "1.4.4"
 APP_AUTHOR = "Mahabub H. Aabir"
 APP_EMAIL = "maha_bub@outlook.com"
 

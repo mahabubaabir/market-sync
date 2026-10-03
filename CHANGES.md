@@ -4,6 +4,22 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.4.4 — 2026-10-03 — News chip/pill color consistency
+
+**Design inconsistency: drawer filter chips vs news-row pills**
+- The Up Next filter chips (`🔴 High`, `🟠 Med`, `🟡 Low`) used hard-coded
+  dark-theme brights (`#ef4444` / `#f97316` / `#eab308`) in every theme, while
+  the news-row pills (`HIGH` / `MED` / `LOW`) they filter used the
+  theme-aware `IMPACT_STYLE` table. On light themes the two looked like
+  different systems — and the yellow `Low` chip was nearly unreadable
+  (contrast 1.63).
+- Both now draw from `IMPACT_STYLE` via a shared `impact_variant()` helper,
+  so chips and pills can never drift apart per theme again. Light-theme chip
+  contrast: High 2.83 → **4.51**, Medium 2.22 → **3.78**, Low 1.63 → **4.96**.
+  Dark themes render pixel-identical to before.
+- Note: currency pills (`AUD`, `CHF`, …) are fine on light themes. `CHF`
+  (`#e2e8f0`) is weak on dark themes (contrast ~1.2) — flagged, not changed.
+
 ### v1.4.3 — 2026-10-03 — Bold logo + launch/news/tray fixes
 
 **Logo (bold two-folded-arrow mark)**

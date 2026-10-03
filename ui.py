@@ -241,6 +241,15 @@ IMPACT_STYLE = {
 IMPACT_SHORT = {"High": "HIGH", "Medium": "MED", "Low": "LOW", "Holiday": "HOL"}
 PILL_DOT = {"High": "🔴", "Medium": "🟠", "Low": "🟡", "Holiday": "🟣"}
 
+
+def impact_variant(theme_name: str) -> str:
+    """'dark' or 'light' IMPACT_STYLE variant for a resolved theme name.
+
+    Single source of truth shared by the drawer filter chips and the news-row
+    pills, so the two can never drift apart per theme again.
+    """
+    return "light" if theme_name in ("light", "mint_light") else "dark"
+
 # v2.0 currency accent palette
 CURRENCY_COLORS = {
     "USD": "#38bdf8", "EUR": "#10b981", "GBP": "#c084fc", "JPY": "#f87171",
@@ -784,7 +793,6 @@ if HAS_QT:
             lay.addWidget(self.title_label, 1)
 
         def update_data(self, ev: dict, theme: dict, theme_name: str, now_utc):
-            is_dark = theme_name not in ("light", "mint_light")
             self.setStyleSheet(
                 f"QFrame {{ background: {theme['row_bg']};"
                 f" border: 1px solid {theme['row_border']}; border-radius: 6px; }}")
@@ -793,7 +801,7 @@ if HAS_QT:
             self.rel_label.setStyleSheet(f"color: {theme['secondary']};")
 
             imp = ev.get("impact", "Low")
-            variant = IMPACT_STYLE.get(imp, IMPACT_STYLE["Low"])["dark" if is_dark else "light"]
+            variant = IMPACT_STYLE.get(imp, IMPACT_STYLE["Low"])[impact_variant(theme_name)]
             fg, bg, border = variant
             self.imp_pill.setText(IMPACT_SHORT.get(imp, imp[:3].upper()))
             self.imp_pill.setStyleSheet(
@@ -1115,10 +1123,13 @@ class SessionPanel(QWidget):
             self.c.menu.setStyleSheet(stylesheet(t))
         except Exception:
             pass
-        # chips: impact colors tinted when checked
-        base_colors = {"High": "#ef4444", "Medium": "#f97316", "Low": "#eab308"}
+        # chips: impact colors tinted when checked. The checked color comes
+        # from IMPACT_STYLE for the active theme — the same table the row
+        # pills use — so chips and pills always match (a hard-coded bright
+        # like #eab308 is unreadable on light themes, cr 1.6).
+        variant = impact_variant(self._theme)
         for lvl, b in self.drawer.chips.items():
-            base = base_colors[lvl]
+            base = IMPACT_STYLE[lvl][variant][0]
             c = QColor(base)
             tint = f"rgba({c.red()}, {c.green()}, {c.blue()}, 46)"
             b.setStyleSheet(
