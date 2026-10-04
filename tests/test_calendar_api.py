@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import calendar_api
 
@@ -73,7 +73,7 @@ class CalendarApiTests(unittest.TestCase):
         }
         self._write_cache(self.news_cache, [event])
 
-        response = unittest.mock.Mock()
+        response = Mock()
         response.json.return_value = {"unexpected": "object"}
         response.raise_for_status.return_value = None
 
