@@ -46,29 +46,54 @@ def _nth_weekday(year: int, month: int, weekday: int, n: int) -> datetime:
         first = datetime(year, month, 1)
         offset = (weekday - first.weekday()) % 7
         return first + timedelta(days=offset + 7 * (n - 1))
+    days = monthrange(year, month)[1]
+    last = datetime(year, month, days)
+    offset = (last.weekday() - weekday) % 7
+    return last - timedelta(days=offset)
+
+
+# NYSE's published 2028 calendar explicitly has no observed New Year's Day
+# holiday when Jan 1, 2028 falls on Saturday.
+_NO_NEW_YEAR_OBSERVED = {2028}
+
+
+def _add_observed_holiday(out: set, holiday: datetime, year: int) -> None:
+    """Add an observed holiday only when its observed date falls in year."""
+    if holiday.month == 1 and holiday.day == 1 and holiday.year in _NO_NEW_YEAR_OBSERVED:
+        observed = holiday
     else:
-        days = monthrange(year, month)[1]
-        last = datetime(year, month, days)
-        offset = (last.weekday() - weekday) % 7
-        return last - timedelta(days=offset)
+        observed = _observed(holiday)
+    if observed.year == year:
+        out.add(observed.date())
 
 
 def nyse_holidays(year: int) -> set:
-    """Return set of date objects when NYSE is fully closed."""
-    good_friday = (_easter_sunday(year) - timedelta(days=2)).date()
-    fixed = [
-        _observed(datetime(year, 1, 1)).date(),    # New Year's
-        _nth_weekday(year, 1, 0, 3).date(),        # MLK
-        _nth_weekday(year, 2, 0, 3).date(),        # Presidents
+    """Return NYSE full-closure dates that fall within the requested year."""
+    good_friday = _easter_sunday(year) - timedelta(days=2)
+    holidays = (
+        datetime(year, 1, 1),                      # New Year's
+        _nth_weekday(year, 1, 0, 3),              # MLK
+        _nth_weekday(year, 2, 0, 3),              # Washington's Birthday
         good_friday,                               # Good Friday
-        _nth_weekday(year, 5, 0, -1).date(),       # Memorial
-        _observed(datetime(year, 6, 19)).date(),   # Juneteenth
-        _observed(datetime(year, 7, 4)).date(),    # Independence
-        _nth_weekday(year, 9, 0, 1).date(),        # Labor
-        _nth_weekday(year, 11, 3, 4).date(),       # Thanksgiving
-        _observed(datetime(year, 12, 25)).date(),  # Christmas
-    ]
-    return set(fixed)
+        _nth_weekday(year, 5, 0, -1),             # Memorial
+        datetime(year, 6, 19),                     # Juneteenth
+        datetime(year, 7, 4),                     # Independence
+        _nth_weekday(year, 9, 0, 1),              # Labor
+        _nth_weekday(year, 11, 3, 4),             # Thanksgiving
+        datetime(year, 12, 25),                    # Christmas
+    )
+    out: set = set()
+    for holiday in holidays:
+        _add_observed_holiday(out, holiday, year)
+
+    # Carry an observed New Year's Day from the following year into the
+    # requested year, except for NYSE's explicit 2028 exception.
+    next_new_year = datetime(year + 1, 1, 1)
+    if next_new_year.year not in _NO_NEW_YEAR_OBSERVED:
+        observed = _observed(next_new_year)
+        if observed.year == year:
+            out.add(observed.date())
+    return out
 
 
 def is_nyse_holiday(day_ny) -> bool:
@@ -76,17 +101,24 @@ def is_nyse_holiday(day_ny) -> bool:
 
 
 def nyse_early_close(day_ny) -> str | None:
-    """Return early close HH:MM if known half-day, else None."""
+    """Return 1pm ET early close for NYSE half-days, else None."""
     y, m, d, wd = day_ny.year, day_ny.month, day_ny.day, day_ny.weekday()
-    # Day after Thanksgiving (4th Fri of Nov)
+    if is_nyse_holiday(day_ny):
+        return None
+
+    # Day after Thanksgiving (4th Friday of November).
     thanksgiving = _nth_weekday(y, 11, 3, 4).day
-    if m == 11 and d == thanksgiving + 1:
+    if m == 11 and d == thanksgiving + 1 and wd == 4:
         return "13:00"
-    # July 3rd early close (if Mon-Thu) + Christmas Eve
+
+    # July 3rd is an early close only when it is a Monday-Thursday trading day.
     if m == 7 and d == 3 and wd in (0, 1, 2, 3):
         return "13:00"
+
+    # Christmas Eve, when it is a weekday trading day.
     if m == 12 and d == 24 and wd in (0, 1, 2, 3, 4):
         return "13:00"
+
     return None
 
 
@@ -113,7 +145,6 @@ def market_day_bounds(market: dict, local_day: datetime) -> tuple[datetime, date
         if early:
             e = _parse_hm(early)
             close_dt = local_day.replace(hour=e.hour, minute=e.minute, second=0, microsecond=0)
-    # ensure tz-aware
     if open_dt.tzinfo is None:
         open_dt = open_dt.replace(tzinfo=tz)
         close_dt = close_dt.replace(tzinfo=tz)
@@ -128,17 +159,23 @@ def _is_trading_day(market: dict, local_dt: datetime) -> bool:
     return True
 
 
+def _countdown(target_local: datetime, now_utc: datetime) -> timedelta:
+    """Return absolute elapsed time, not a wall-clock difference."""
+    return target_local.astimezone(timezone.utc) - now_utc
+
+
 def market_status(market: dict, now_utc: datetime | None = None) -> dict:
     """Return open state, next transition, countdown, progress, local time."""
     if now_utc is None:
         now_utc = datetime.now(timezone.utc)
     if now_utc.tzinfo is None:
         now_utc = now_utc.replace(tzinfo=timezone.utc)
+    else:
+        now_utc = now_utc.astimezone(timezone.utc)
 
     tz = ZoneInfo(market["tz"])
     now_local = now_utc.astimezone(tz)
 
-    # Find today's bounds
     if _is_trading_day(market, now_local):
         open_dt, close_dt = market_day_bounds(market, now_local)
         if open_dt <= now_local < close_dt:
@@ -150,25 +187,24 @@ def market_status(market: dict, now_utc: datetime | None = None) -> dict:
                 "next_label": "closes",
                 "next_at_utc": close_dt.astimezone(timezone.utc),
                 "next_at_local": close_dt,
-                "countdown": close_dt - now_local,
+                "countdown": _countdown(close_dt, now_utc),
                 "progress": min(1.0, max(0.0, elapsed / total)) if total else 0,
                 "now_local": now_local,
                 "now_utc": now_utc,
             }
         if now_local < open_dt:
-            total = (close_dt - open_dt).total_seconds()
             return {
                 "market": market,
                 "is_open": False,
                 "next_label": "opens",
                 "next_at_utc": open_dt.astimezone(timezone.utc),
                 "next_at_local": open_dt,
-                "countdown": open_dt - now_local,
+                "countdown": _countdown(open_dt, now_utc),
                 "progress": 0.0,
                 "now_local": now_local,
                 "now_utc": now_utc,
             }
-    # After close or non-trading day -> scan forward (max 10 days)
+
     for i in range(1, 11):
         cand = (now_local + timedelta(days=i)).replace(hour=12, minute=0, second=0, microsecond=0)
         if not _is_trading_day(market, cand):
@@ -180,12 +216,12 @@ def market_status(market: dict, now_utc: datetime | None = None) -> dict:
             "next_label": "opens",
             "next_at_utc": open_dt.astimezone(timezone.utc),
             "next_at_local": open_dt,
-            "countdown": open_dt - now_local,
+            "countdown": _countdown(open_dt, now_utc),
             "progress": 0.0,
             "now_local": now_local,
             "now_utc": now_utc,
         }
-    # Fallback (should never hit)
+
     return {
         "market": market, "is_open": False, "next_label": "opens",
         "next_at_utc": now_utc + timedelta(days=1),
