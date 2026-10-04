@@ -1,11 +1,12 @@
 """Free economic-calendar feed (ForexFactory via FairEconomy, no API key).
 
 Feed: https://nfs.faireconomy.media/ff_calendar_thisweek.json
-Cache: ~/.cache/market-sync/calendar.json (TTL 15 min default)
+Cache: ~/.cache/market-sync/news_events.json (TTL 15 min default)
 """
 from __future__ import annotations
 import json
 import os
+import tempfile
 from datetime import datetime, timezone, timedelta
 
 try:
@@ -22,6 +23,7 @@ CACHE_DIR = _CACHE_DIR
 CACHE_PATH = NEWS_CACHE_PATH
 
 IMPACT_RANK = {"All": 0, "High": 3, "Medium": 2, "Low": 1, "Holiday": 0, "": 0}
+VALID_IMPACTS = {"High", "Medium", "Low", "Holiday"}
 
 
 def _parse_date(raw: str) -> datetime | None:
@@ -29,7 +31,6 @@ def _parse_date(raw: str) -> datetime | None:
         return None
     try:
         s = raw.strip()
-        # Feed format is usually "2026-09-18T12:30:00-04:00" or "...Z"
         if s.endswith("Z"):
             s = s[:-1] + "+00:00"
         dt = datetime.fromisoformat(s)
@@ -41,19 +42,31 @@ def _parse_date(raw: str) -> datetime | None:
 
 
 def _normalize(item: dict) -> dict | None:
+    if not isinstance(item, dict):
+        return None
     title = (item.get("title") or "").strip()
     country = (item.get("country") or item.get("currency") or "").strip().upper()
     if not title:
         return None
+
     dt = _parse_date(item.get("date") or "")
-    impact = (item.get("impact") or "").strip().capitalize()
-    if impact not in ("High", "Medium", "Low", "Holiday"):
-        impact = "Low" if impact else "Low"
+    if dt is None:
+        return None
+
+    impact_raw = (item.get("impact") or "").strip().capitalize()
+    if not impact_raw:
+        impact = "Low"
+    elif impact_raw in VALID_IMPACTS:
+        impact = impact_raw
+    else:
+        # Never silently downgrade an unknown upstream impact to Low.
+        return None
+
     return {
         "title": title,
         "country": country,
         "currency": country,
-        "date_utc": dt.isoformat() if dt else "",
+        "date_utc": dt.isoformat(),
         "impact": impact,
         "forecast": str(item.get("forecast") or "").strip(),
         "previous": str(item.get("previous") or "").strip(),
@@ -70,9 +83,8 @@ def _cache_file() -> str:
     return CACHE_PATH
 
 
-def _read_cache(max_age_min: int = 60 * 24) -> list[dict]:
+def _read_cache(path: str, max_age_min: int = 60 * 24) -> list[dict]:
     try:
-        path = _cache_file()
         if not os.path.exists(path):
             return []
         age = (datetime.now().timestamp() - os.path.getmtime(path)) / 60
@@ -88,30 +100,43 @@ def _read_cache(max_age_min: int = 60 * 24) -> list[dict]:
 def _write_cache(events: list[dict]) -> None:
     try:
         os.makedirs(CACHE_DIR, exist_ok=True)
-        with open(CACHE_PATH, "w", encoding="utf-8") as f:
-            json.dump(events, f, indent=1)
+        fd, tmp = tempfile.mkstemp(prefix="news_events-", suffix=".tmp", dir=CACHE_DIR)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(events, f, indent=1)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, CACHE_PATH)
+        finally:
+            if os.path.exists(tmp):
+                os.remove(tmp)
     except Exception:
         pass
 
 
 def fetch_events(force_refresh: bool = False, cache_ttl_min: int = 15) -> tuple[list[dict], bool, str]:
     """Returns (events, from_cache, note). Never raises."""
-    cached = _read_cache(max_age_min=60 * 24 * 8)
-    # Use fresh cache without network if within TTL and not forced
+    cache_path = _cache_file()
+    cached = _read_cache(cache_path, max_age_min=60 * 24 * 8)
+
     if cached and not force_refresh:
         try:
-            age = (datetime.now().timestamp() - os.path.getmtime(CACHE_PATH)) / 60
+            age = (datetime.now().timestamp() - os.path.getmtime(cache_path)) / 60
             if age < cache_ttl_min:
                 return cached, True, f"cache {int(age)}m old"
         except Exception:
             pass
+
     if not HAS_REQUESTS:
         note = "requests not installed — using cache" if cached else "requests not installed"
         return cached, True, note
+
     try:
         r = requests.get(FF_URL, timeout=15, headers={"User-Agent": "market-sync/0.1"})
         r.raise_for_status()
         raw = r.json()
+        if not isinstance(raw, list):
+            raise ValueError("economic calendar feed returned a non-list payload")
         events = [e for e in (_normalize(x) for x in raw) if e]
         events.sort(key=lambda e: e["date_utc"])
         _write_cache(events)

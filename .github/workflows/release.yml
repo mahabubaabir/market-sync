@@ -29,6 +29,12 @@ jobs:
           chmod +x build-deb.sh install.sh
           ./build-deb.sh
 
+      - name: Unit tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python3 -m unittest discover -s tests -v
+
       - name: Smoke test
         env:
           QT_QPA_PLATFORM: offscreen
