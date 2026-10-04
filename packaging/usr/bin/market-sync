@@ -27,6 +27,17 @@ run_loop() {
   exit "$code"
 }
 
+# Informational and IPC commands must run in the foreground so their
+# output and exit codes reach the caller. (Previously EVERY terminal
+# invocation detached and swallowed stdout, so even `market-sync --version`
+# printed nothing — its output ended up in app.log instead.)
+case "${1:-}" in
+  --version|--check-update|--help|-h|--cli|--once|\
+  --toggle|--show|--hide|--preferences|--quit|--market)
+    exec /usr/bin/python3 "$APP_DIR/main.py" "$@"
+    ;;
+esac
+
 # Launching from a terminal? Detach so the app survives the terminal closing.
 if [ -t 2 ]; then
   setsid /usr/bin/market-sync "$@" >/dev/null 2>&1 < /dev/null &

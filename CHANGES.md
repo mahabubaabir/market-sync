@@ -4,6 +4,22 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.4.5 — 2026-10-04 — Launcher swallowed `--version` output
+
+**Why the app still showed 1.4.3 after installing 1.4.4**
+- Two stacked causes. First, installing the .deb does not restart the
+  already-running daemon, so the panel/Preferences kept showing the old
+  in-memory 1.4.3 until `--quit` + relaunch.
+- Second, `market-sync --version` printed **nothing**: the launcher detached
+  every terminal invocation into the background with stdout swallowed (tty),
+  or appended it to `app.log` (no tty). The version string ended up in the
+  log file instead of the terminal, so there was no way to check.
+- `packaging/usr/bin/market-sync` now `exec`s informational and IPC flags
+  (`--version`, `--check-update`, `--help`, `--cli`, `--once`, `--toggle`,
+  `--show`, `--hide`, `--preferences`, `--quit`, `--market`) in the
+  foreground. Plain GUI launches still detach. Verified `--version` prints
+  under both a pty and a pipe, and `--hidden` still detaches promptly.
+
 ### v1.4.4 — 2026-10-03 — News chip/pill color consistency
 
 **Design inconsistency: drawer filter chips vs news-row pills**
