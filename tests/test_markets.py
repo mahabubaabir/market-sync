@@ -29,6 +29,14 @@ class MarketCalendarTests(unittest.TestCase):
         self.assertNotIn(datetime(2027, 12, 31).date(), nyse_holidays(2027))
         self.assertNotIn(datetime(2027, 12, 31).date(), nyse_holidays(2028))
 
+    def test_nyse_2028_published_early_close(self):
+        self.assertEqual(nyse_early_close(datetime(2028, 7, 3)), "13:00")
+        self.assertEqual(nyse_early_close(datetime(2028, 11, 24)), "13:00")
+
+    def test_nyse_observed_christmas_closure_2027(self):
+        self.assertIn(datetime(2027, 12, 24).date(), nyse_holidays(2027))
+        self.assertIsNone(nyse_early_close(datetime(2027, 12, 24)))
+
 
 if __name__ == "__main__":
     unittest.main()
