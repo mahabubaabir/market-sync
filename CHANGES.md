@@ -4,6 +4,39 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.4.6 — 2026-10-04 — Pill shapes + off-day upcoming news
+
+**Design inconsistency: news pills rendered as sharp boxes (light themes)**
+- Measured on X11: the `HIGH`/`MED`/`LOW`/`HOL` row pills and every solid
+  button rendered with square corners despite `border-radius` in the
+  stylesheet. Root cause: Qt paints opaque QSS backgrounds square, silently
+  ignoring the radius — it only rounds the blended (translucent) path. That
+  is why the same pills looked rounded on dark themes (translucent `rgba`
+  backgrounds) but boxy on light themes (opaque pastel backgrounds).
+- New `pill_label()` helper sets `WA_TranslucentBackground`, forcing the
+  rounded path without changing any color. Applied to news impact/currency
+  pills, the market-card `OPEN`/`CLOSED` pill (preventive), and the solid
+  Preferences buttons (`Save`, `Install`, `Quit app` — same bug class).
+  Verified on-screen: all flip from opaque to transparent corners.
+- Drawer filter chips were already rounded (translucent tints) — no change.
+
+**New feature: Up Next works on off days**
+- On weekends the 72h drawer window is empty and the panel just said "No
+  upcoming economic events". Now, when the window is empty:
+  - feed holds later events (e.g. Sunday evening → Friday) → the next up
+    to 16 are shown with their countdowns (`4d 4h`, `5d 10h`) via new
+    `calendar_api.upcoming_events()` (14-day cap, same currency/impact
+    filters, `_dt` attached for the rows);
+  - events exist but filters exclude them all → "No upcoming events match
+    the selected filters";
+  - feed holds nothing in the future (weekend gap before next week's
+    calendar is published — verified live: even a forced fetch returns 0
+    future events) → "No upcoming events yet — next week's calendar isn't
+    published".
+- All three modes verified end-to-end against live user settings; tray
+  tooltip and alert paths degrade gracefully (unchanged) when there is
+  nothing upcoming.
+
 ### v1.4.5 — 2026-10-04 — Launcher swallowed `--version` output
 
 **Why the app still showed 1.4.3 after installing 1.4.4**

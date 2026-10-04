@@ -169,6 +169,48 @@ def next_event(events: list[dict], currencies: list[str] | None = None,
     return upcoming[0] if upcoming else None
 
 
+def upcoming_events(events: list[dict], currencies: list[str] | None = None,
+                    active_impacts: list[str] | None = None,
+                    now_utc: datetime | None = None,
+                    limit: int = 16, max_days: int = 14) -> list[dict]:
+    """Next future events ignoring the hours window (off-day cover).
+
+    When the drawer's 72h window is empty but the feed holds later events
+    (e.g. Sunday evening looking at the new week's Friday), return those —
+    rows already render relative countdowns ("2d 4h"), so they display as-is.
+    Returns [] when the feed itself holds nothing in the future (weekend gap
+    before next week's calendar is published).
+    """
+    now_utc = now_utc or datetime.now(timezone.utc)
+    active = set(active_impacts) if active_impacts else None
+    cur = {c.upper() for c in (currencies or [])}
+    out = []
+    for e in events:
+        dt = _event_dt(e)
+        if dt is None or dt < now_utc - timedelta(hours=2):
+            continue
+        if dt > now_utc + timedelta(days=max_days):
+            continue
+        if cur and e.get("currency", "").upper() not in cur:
+            continue
+        if not _impact_included(e.get("impact", ""), 0, active):
+            continue
+        out.append({**e, "_dt": dt})
+    out.sort(key=lambda e: e["_dt"])
+    return out[:limit]
+
+
+def has_future_events(events: list[dict],
+                      now_utc: datetime | None = None) -> bool:
+    """True when the feed holds anything not yet over (weekend-gap check)."""
+    now_utc = now_utc or datetime.now(timezone.utc)
+    for e in events:
+        dt = _event_dt(e)
+        if dt is not None and dt >= now_utc - timedelta(hours=2):
+            return True
+    return False
+
+
 def relative_time(dt: datetime, now_utc: datetime | None = None) -> str:
     """v0.2 news row style: '12m', '5h 42m', '2d 3h', '38m ago'."""
     now_utc = now_utc or datetime.now(timezone.utc)

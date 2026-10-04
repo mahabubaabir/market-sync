@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "name": "Market Sync Design System & Technical Specification",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "specificationVersion": "2.0.0",
   "project": {
     "name": "Market Sync",

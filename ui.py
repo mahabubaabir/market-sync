@@ -526,11 +526,34 @@ def make_tray_logo_icon(any_open: bool, size: int = 24) -> "QIcon":
     return QIcon(pm)
 
 
+def pill_label(text: str = "") -> "QLabel":
+    """Capsule text label with corners Qt actually rounds.
+
+    Qt paints opaque QSS backgrounds square, silently ignoring
+    border-radius (measured on X11: light-theme news pills rendered as sharp
+    boxes while dark translucent ones rounded). The attribute forces the
+    blended path without changing any color.
+    """
+    lab = QLabel(text)
+    lab.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+    return lab
+
+
 def _empty_text(note: str | None) -> str:
     """Placeholder shown while the news drawer has no rows."""
     if not note or note.startswith(("news:", "live", "cache")):
         return "No upcoming economic events"
     return note
+
+
+def _empty_text_for(note: str | None, mode: str) -> str:
+    """Placeholder for an empty news drawer, by cause."""
+    if mode == "gap":
+        return ("No upcoming events yet — "
+                "next week's calendar isn't published")
+    if mode == "filtered":
+        return "No upcoming events match the selected filters"
+    return _empty_text(note)
 
 
 def _next_nyse_holiday_line(now_utc=None) -> str:
@@ -693,7 +716,7 @@ if HAS_QT:
             self.cd_label.setFont(mono_font(22))
             bot.addWidget(self.cd_label)
             bot.addStretch(1)
-            self.pill = QLabel("OPEN")
+            self.pill = pill_label("OPEN")
             self.pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.pill.setFixedSize(56, 18)
             self.pill.setFont(app_font(9, QFont.Weight.Bold))
@@ -776,13 +799,13 @@ if HAS_QT:
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             lay.addWidget(self.rel_label)
 
-            self.imp_pill = QLabel("LOW")
+            self.imp_pill = pill_label("LOW")
             self.imp_pill.setFont(app_font(8, QFont.Weight.Bold))
             self.imp_pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.imp_pill.setFixedSize(40, 17)
             lay.addWidget(self.imp_pill)
 
-            self.cur_pill = QLabel("USD")
+            self.cur_pill = pill_label("USD")
             self.cur_pill.setFont(app_font(9, QFont.Weight.Bold))
             self.cur_pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.cur_pill.setFixedSize(40, 17)
@@ -917,7 +940,11 @@ if HAS_QT:
             self.chip_all.blockSignals(False)
 
         # -- content
-        def update_events(self, shown: list, now_utc, note: str | None = None):
+        def update_events(self, shown: list, now_utc, note: str | None = None,
+                          mode: str = "window"):
+            """mode: 'window' (72h), 'upcoming' (beyond-window fallback),
+            'filtered' (feed has events but filters exclude all),
+            'gap' (feed holds nothing in the future — weekend gap)."""
             t = THEMES[self.c.panel._theme]
             name = self.c.panel._theme
             self.date_label.setText(
@@ -936,7 +963,7 @@ if HAS_QT:
                         w.deleteLater()
                 self._rows = []
                 if not shown:
-                    lab = QLabel(_empty_text(note))
+                    lab = QLabel(_empty_text_for(note, mode))
                     lab.setStyleSheet(f"color: {t['muted']}; font-size: 11px;")
                     lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
                     self.rows_layout.insertWidget(0, lab)
@@ -953,7 +980,7 @@ if HAS_QT:
             # Fetching state changes even when the row list does not — keep the
             # empty-state text honest instead of silently showing "No events".
             if not shown and self._rows and isinstance(self._rows[0], QLabel):
-                txt = _empty_text(note)
+                txt = _empty_text_for(note, mode)
                 if self._rows[0].text() != txt:
                     self._rows[0].setText(txt)
 else:
@@ -1165,7 +1192,20 @@ class SessionPanel(QWidget):
         shown = calendar_api.filter_events(
             news, self.c.settings["currencies"], None, 72, now_utc,
             active_impacts=active)
-        self.drawer.update_events(shown[:16], now_utc, news_note)
+        mode = "window"
+        if not shown:
+            # Off-day cover: the 72h window is empty but the feed may hold
+            # later events (e.g. Sunday evening → Friday). Show those with
+            # their countdowns instead of an empty drawer.
+            upcoming = calendar_api.upcoming_events(
+                news, self.c.settings["currencies"], active, now_utc)
+            if upcoming:
+                shown, mode = upcoming, "upcoming"
+            elif calendar_api.has_future_events(news, now_utc):
+                mode = "filtered"  # events exist, filters exclude them all
+            else:
+                mode = "gap"  # weekend gap: feed holds nothing in the future
+        self.drawer.update_events(shown[:16], now_utc, news_note, mode)
 
 
 if HAS_QT:
@@ -1345,6 +1385,8 @@ if HAS_QT:
             self.check_btn.clicked.connect(self._check_now)
             up_row.addWidget(self.check_btn)
             self.install_btn = QPushButton("Install")
+            self.install_btn.setAttribute(
+                Qt.WidgetAttribute.WA_TranslucentBackground, True)  # keep radius 7 round
             self.install_btn.setProperty("class", "primary")
             self.install_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self.install_btn.clicked.connect(self._install_now)
@@ -1373,6 +1415,8 @@ if HAS_QT:
             foot.addWidget(foot_info)
             foot.addStretch(1)
             quit_btn = QPushButton("Quit app")
+            quit_btn.setAttribute(
+                Qt.WidgetAttribute.WA_TranslucentBackground, True)  # keep radius 7 round
             quit_btn.setProperty("class", "quitbtn")
             quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             quit_btn.clicked.connect(self.c.quit_app)
@@ -1390,6 +1434,8 @@ if HAS_QT:
             cancel_btn.clicked.connect(self.reject)
             bottom.addWidget(cancel_btn)
             save_btn = QPushButton("Save")
+            save_btn.setAttribute(
+                Qt.WidgetAttribute.WA_TranslucentBackground, True)  # keep radius 7 round
             save_btn.setProperty("class", "primary")
             save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             save_btn.clicked.connect(self._save)
