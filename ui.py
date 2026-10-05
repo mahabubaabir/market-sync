@@ -764,7 +764,7 @@ if HAS_QT:
 
         def __init__(self, parent: QWidget | None = None):
             super().__init__(parent)
-            self.setFixedHeight(30)
+            self.setFixedHeight(34)
             lay = QHBoxLayout(self)
             lay.setContentsMargins(8, 2, 8, 2)
             lay.setSpacing(7)
@@ -1231,6 +1231,11 @@ class SessionPanel(QWidget):
         self.open_detail.setStyleSheet(f"color: {t['secondary']};")
         self.local_clock.setText(engine.format_local_clock(now_utc.astimezone(), is_12h))
         self.local_clock.setStyleSheet(f"color: {t['secondary']};")
+        self.subtitle.setText(
+            "GLOBAL SESSION CLOCK  •  " +
+            engine.format_local_clock(now_utc.astimezone(), is_12h)
+        )
+        self.subtitle.setStyleSheet(f"color: {t['secondary']};")
 
         for i, s in enumerate(statuses[:len(self.flow_labels)]):
             m = s["market"]
