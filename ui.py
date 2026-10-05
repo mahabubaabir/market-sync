@@ -1280,7 +1280,7 @@ class SessionPanel(QWidget):
         shown = calendar_api.filter_events(
             news, self.c.settings["currencies"], None, 72, now_utc,
             active_impacts=active)
-<        mode = "window"
+        mode = "window"
         if not shown:
             # Off-day cover: the 72h window is empty but the feed may hold
             # later events (e.g. Sunday evening → Friday). Show those with
