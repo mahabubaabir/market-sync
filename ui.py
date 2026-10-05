@@ -328,7 +328,7 @@ QFrame#PanelRoot {{
 }}
 QLabel {{ color: {t['text']}; background: transparent; }}
 QLabel.caption {{ color: {t['secondary']}; font-size: 10px; font-weight: 700; letter-spacing: 1.0px; }}
-QFrame#MarketCard {{ border-radius: 10px; }}
+QFrame#MarketCard {{ border-radius: 14px; }}
 QPushButton.bar {{ background: transparent; color: {t['secondary']}; border: none; border-radius: 6px; padding: 2px 6px; font-size: 13px; }}
 QPushButton.bar:hover {{ color: {t['text']}; background: {t['input_hover']}; }}
 QPushButton.ghost {{ background: transparent; color: {t['secondary']}; border: 1px solid {t['input_border']}; border-radius: 7px; padding: 4px 10px; font-size: 12px; }}
@@ -690,16 +690,16 @@ if HAS_QT:
             super().__init__(parent)
             self.market = market
             self.setObjectName("MarketCard")
-            self.setFixedHeight(82)
+            self.setFixedHeight(104)
             self.setCursor(Qt.CursorShape.PointingHandCursor)
 
             lay = QVBoxLayout(self)
-            lay.setContentsMargins(10, 8, 10, 8)
+            lay.setContentsMargins(12, 10, 12, 10)
             lay.setSpacing(4)
 
             top = QHBoxLayout()
             top.setSpacing(6)
-            self.badge = LandmarkBadge(market.get("landmark", "london"), market["symbol"], 26)
+            self.badge = LandmarkBadge(market.get("landmark", "london"), market["symbol"], 32)
             top.addWidget(self.badge)
             self.name_label = QLabel(market["name"])
             self.name_label.setFont(app_font(13, QFont.Weight.DemiBold))
@@ -713,15 +713,15 @@ if HAS_QT:
             bot = QHBoxLayout()
             bot.setSpacing(6)
             self.cd_label = QLabel("+00:00")
-            self.cd_label.setFont(mono_font(22))
+            self.cd_label.setFont(mono_font(25))
             bot.addWidget(self.cd_label)
             bot.addStretch(1)
             self.pill = pill_label("OPEN")
             self.pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.pill.setFixedSize(56, 18)
+            self.pill.setFixedSize(58, 20)
             self.pill.setFont(app_font(9, QFont.Weight.Bold))
             bot.addWidget(self.pill)
-            self.ring = MiniRingTimer(20)
+            self.ring = MiniRingTimer(28)
             bot.addWidget(self.ring)
             lay.addLayout(bot)
 
@@ -1006,7 +1006,7 @@ class SessionPanel(QWidget):
             | Qt.WindowType.WindowStaysOnTopHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFixedWidth(410)
+        self.setFixedWidth(470)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -1016,10 +1016,73 @@ class SessionPanel(QWidget):
         outer.addWidget(self.root)
 
         root = QVBoxLayout(self.root)
-        root.setContentsMargins(10, 10, 10, 10)
-        root.setSpacing(8)
+        root.setContentsMargins(14, 14, 14, 14)
+        root.setSpacing(10)
 
-        # 1. market cards grid (2 columns, v0.2 order)
+        # 1. live command-center summary
+        self.summary = QFrame()
+        self.summary.setObjectName("SummaryCard")
+        sl = QHBoxLayout(self.summary)
+        sl.setContentsMargins(12, 9, 12, 9)
+        sl.setSpacing(12)
+
+        self.open_count = QLabel("0")
+        self.open_count.setFont(mono_font(22, QFont.Weight.Bold))
+        self.open_count.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sl.addWidget(self.open_count)
+
+        open_col = QVBoxLayout()
+        open_col.setSpacing(0)
+        open_title = QLabel("MARKETS OPEN")
+        open_title.setProperty("class", "caption")
+        open_col.addWidget(open_title)
+        self.open_detail = QLabel("—")
+        self.open_detail.setFont(app_font(9))
+        open_col.addWidget(self.open_detail)
+        sl.addLayout(open_col)
+
+        divider = QFrame()
+        divider.setFixedWidth(1)
+        divider.setObjectName("SummaryDivider")
+        sl.addWidget(divider)
+
+        event_col = QVBoxLayout()
+        event_col.setSpacing(0)
+        event_title = QLabel("NEXT EVENT")
+        event_title.setProperty("class", "caption")
+        event_col.addWidget(event_title)
+        self.next_event = QLabel("No upcoming events")
+        self.next_event.setFont(app_font(10, QFont.Weight.DemiBold))
+        self.next_event.setWordWrap(True)
+        event_col.addWidget(self.next_event)
+        self.next_countdown = QLabel("")
+        self.next_countdown.setFont(mono_font(10, QFont.Weight.Bold))
+        event_col.addWidget(self.next_countdown)
+        sl.addLayout(event_col, 1)
+        root.addWidget(self.summary)
+
+        flow_header = QHBoxLayout()
+        flow_header.setContentsMargins(2, 0, 2, 0)
+        flow_header.addWidget(QLabel("SESSION FLOW"))
+        flow_header.addStretch(1)
+        self.local_clock = QLabel("--:--")
+        self.local_clock.setFont(mono_font(10, QFont.Weight.DemiBold))
+        flow_header.addWidget(self.local_clock)
+        root.addLayout(flow_header)
+
+        self.flow = QHBoxLayout()
+        self.flow.setSpacing(5)
+        self.flow_labels = []
+        for _ in range(len(MARKETS)):
+            lab = QLabel("—")
+            lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lab.setMinimumWidth(60)
+            lab.setFont(app_font(8, QFont.Weight.DemiBold))
+            self.flow.addWidget(lab, 1)
+            self.flow_labels.append(lab)
+        root.addLayout(self.flow)
+
+        # 2. market cards grid
         self.cards: dict[str, MarketCardWidget] = {}
         self.grid = QGridLayout()
         self.grid.setContentsMargins(0, 0, 0, 0)
@@ -1033,7 +1096,7 @@ class SessionPanel(QWidget):
         root.addLayout(self.grid)
         self.rebuild_grid()
 
-        # 2. brand bar (32px): logo + MARKET SYNC + drawer + bell + gear + close
+        # 3. brand/footer bar: logo + MARKET SYNC + drawer + bell + gear + close
         brand = QHBoxLayout()
         brand.setSpacing(4)
         self.logo = QLabel()
@@ -1088,7 +1151,7 @@ class SessionPanel(QWidget):
         brand.addWidget(self.close_btn)
         root.addLayout(brand)
 
-        # 3. Up Next drawer
+        # 4. Up Next drawer
         self.drawer = UpNextDrawer(controller)
         self.drawer.setVisible(bool(controller.settings.get("news_drawer_expanded", True)))
         root.addWidget(self.drawer)
@@ -1150,6 +1213,13 @@ class SessionPanel(QWidget):
             self.c.menu.setStyleSheet(stylesheet(t))
         except Exception:
             pass
+        self.summary.setStyleSheet(
+            f"QFrame#SummaryCard {{ background: {t['input_bg']};"
+            f" border: 1px solid {t['input_border']}; border-radius: 12px; }}"
+            f"QFrame#SummaryDivider {{ background: {t['divider']}; }}")
+        self.next_countdown.setStyleSheet(f"color: {t['cyan']};")
+        self.open_count.setStyleSheet(f"color: {t['green']};")
+
         # chips: impact colors tinted when checked. The checked color comes
         # from IMPACT_STYLE for the active theme — the same table the row
         # pills use — so chips and pills always match (a hard-coded bright
@@ -1180,6 +1250,24 @@ class SessionPanel(QWidget):
         is_12h = self.c.settings.get("time_format", "24h") == "12h"
         brighten = bool(self.c.settings.get("active_brighten", True))
 
+        open_sessions = [s for s in statuses if s["is_open"]]
+        self.open_count.setText(str(len(open_sessions)))
+        self.open_count.setStyleSheet(f"color: {t['green']};")
+        self.open_detail.setText(
+            ", ".join(s["market"]["symbol"] for s in open_sessions) or "No major session open")
+        self.open_detail.setStyleSheet(f"color: {t['secondary']};")
+        self.local_clock.setText(engine.format_local_clock(now_utc.astimezone(), is_12h))
+        self.local_clock.setStyleSheet(f"color: {t['secondary']};")
+
+        for i, s in enumerate(statuses[:len(self.flow_labels)]):
+            m = s["market"]
+            self.flow_labels[i].setText(f"{'●' if s['is_open'] else '○'} {m['symbol']}")
+            self.flow_labels[i].setStyleSheet(
+                f"background: {t['pill_open_bg'] if s['is_open'] else t['pill_closed_bg']};"
+                f"color: {t['green'] if s['is_open'] else t['closed']};"
+                f"border: 1px solid {t['green'] if s['is_open'] else t['input_border']};"
+                "border-radius: 8px; padding: 4px 5px;")
+
         for s in statuses:
             mid = s["market"]["id"]
             if mid in self.cards:
@@ -1192,7 +1280,7 @@ class SessionPanel(QWidget):
         shown = calendar_api.filter_events(
             news, self.c.settings["currencies"], None, 72, now_utc,
             active_impacts=active)
-        mode = "window"
+<        mode = "window"
         if not shown:
             # Off-day cover: the 72h window is empty but the feed may hold
             # later events (e.g. Sunday evening → Friday). Show those with
@@ -1205,6 +1293,14 @@ class SessionPanel(QWidget):
                 mode = "filtered"  # events exist, filters exclude them all
             else:
                 mode = "gap"  # weekend gap: feed holds nothing in the future
+        nxt = shown[0] if shown else None
+        if nxt and nxt.get("_dt"):
+            self.next_event.setText(
+                f"{nxt.get('currency','')}  {nxt.get('title','Event')}")
+            self.next_countdown.setText(calendar_api.relative_time(nxt["_dt"], now_utc))
+        else:
+            self.next_event.setText("No upcoming events")
+            self.next_countdown.setText("")
         self.drawer.update_events(shown[:16], now_utc, news_note, mode)
 
 
