@@ -1258,11 +1258,6 @@ class SessionPanel(QWidget):
         self.open_detail.setStyleSheet(f"color: {t['secondary']};")
         self.local_clock.setText(engine.format_local_clock(now_utc.astimezone(), is_12h))
         self.local_clock.setStyleSheet(f"color: {t['secondary']};")
-        self.subtitle.setText(
-            "GLOBAL SESSION CLOCK  •  " +
-            engine.format_local_clock(now_utc.astimezone(), is_12h)
-        )
-        self.subtitle.setStyleSheet(f"color: {t['secondary']};")
 
         for i, s in enumerate(statuses[:len(self.flow_labels)]):
             m = s["market"]
