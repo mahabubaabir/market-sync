@@ -250,6 +250,16 @@ def impact_variant(theme_name: str) -> str:
     """
     return "light" if theme_name in ("light", "mint_light") else "dark"
 
+
+def spec_green(theme_name: str) -> str:
+    """Fixed design-system green for OPEN indicators.
+
+    Open sessions render in this green everywhere (Cinnamon applet text,
+    tray status dot, flow chips, open count, progress rings) independent of
+    the app theme; the light variant keeps it legible on light panels.
+    """
+    return "#16a34a" if impact_variant(theme_name) == "light" else "#30d158"
+
 # v2.0 currency accent palette
 CURRENCY_COLORS = {
     "USD": "#38bdf8", "EUR": "#10b981", "GBP": "#c084fc", "JPY": "#f87171",
@@ -396,10 +406,11 @@ def _panel_markup(statuses, settings, now_utc) -> tuple[str, str, bool]:
     if not toks:
         toks = [token(s) for s in statuses[:1]]
     plain = "  ".join(f"{sym} {val}" for sym, val, _ in toks)
-    # Theme tokens, not literals: hard-coded dark-theme green/silver rendered
-    # almost invisible on a light Cinnamon panel.
-    t = THEMES[resolve_theme(settings.get("theme", "system"))]
-    open_col, closed_col = t["green"], t["closed"]
+    # Fixed spec green for open sessions (independent of the app theme);
+    # closed sessions stay theme-aware silver for panel legibility.
+    theme_name = resolve_theme(settings.get("theme", "system"))
+    t = THEMES[theme_name]
+    open_col, closed_col = spec_green(theme_name), t["closed"]
     parts = []
     for sym, val, op in toks:
         if op:
@@ -464,7 +475,8 @@ def tray_label_text(selected: dict, nxt, settings: dict, now_utc) -> str:
 
 
 def make_tray_icon(text: str, is_open: bool, theme: str) -> "QIcon":
-    t = THEMES[resolve_theme(theme)]
+    theme_name = resolve_theme(theme)
+    t = THEMES[theme_name]
     font = QFont("Sans", 11, QFont.Weight.Bold)
     fm = QFontMetrics(font)
     w = max(60, fm.horizontalAdvance(text) + 30)
@@ -476,7 +488,7 @@ def make_tray_icon(text: str, is_open: bool, theme: str) -> "QIcon":
     p.setBrush(QColor(GREEN if is_open else "#71717a"))
     p.setPen(Qt.PenStyle.NoPen)
     p.drawEllipse(2, 8, 12, 12)
-    p.setPen(QColor(t["tray_text"]))
+    p.setPen(QColor(spec_green(theme_name) if is_open else t["tray_text"]))
     p.drawText(20, 0, w - 20, 28, Qt.AlignmentFlag.AlignVCenter, text)
     p.end()
     return QIcon(pm)
@@ -484,7 +496,9 @@ def make_tray_icon(text: str, is_open: bool, theme: str) -> "QIcon":
 
 def make_tray_icon_multi(segments: list, theme: str) -> "QIcon":
     """Top panel style: '● LON +04:05  ○ NYC -00:35' (bright/dim)."""
-    t = THEMES[resolve_theme(theme)]
+    theme_name = resolve_theme(theme)
+    t = THEMES[theme_name]
+    open_green = spec_green(theme_name)
     font = QFont("Sans", 11, QFont.Weight.Bold)
     fm = QFontMetrics(font)
     labels = [f"{'●' if o else '○'} {txt}" for txt, o in segments]
@@ -498,7 +512,7 @@ def make_tray_icon_multi(segments: list, theme: str) -> "QIcon":
     p.setFont(font)
     x = 7
     for label, (_, is_open) in zip(labels, segments):
-        p.setPen(QColor(t["tray_text"] if is_open else t["closed"]))
+        p.setPen(QColor(open_green if is_open else t["closed"]))
         adv = fm.horizontalAdvance(label)
         p.drawText(x, 0, adv + 4, 28, Qt.AlignmentFlag.AlignVCenter, label)
         x += adv + fm.horizontalAdvance(sep)
@@ -649,11 +663,12 @@ if HAS_QT:
             self._track = QColor("rgba(255, 255, 255, 0.12)")
             self._arc = QColor(GREEN)
 
-        def set_state(self, frac: float, is_open: bool, t: dict):
+        def set_state(self, frac: float, is_open: bool, t: dict,
+                      theme_name: str = "dark"):
             self._frac = min(1.0, max(0.0, frac))
             self._open = is_open
             self._track = qcolor(t["ring_track"])
-            self._arc = qcolor(t["green"])
+            self._arc = QColor(spec_green(theme_name))
             self.update()
 
         def paintEvent(self, _ev):
@@ -731,7 +746,7 @@ if HAS_QT:
             super().mousePressEvent(ev)
 
         def update_data(self, status: dict, t: dict, selected: bool,
-                        is_12h: bool, brighten: bool):
+                        is_12h: bool, brighten: bool, theme_name: str = "dark"):
             is_open = bool(status["is_open"])
             self.badge.set_theme(t)
             self.time_label.setText(engine.format_local_clock(status["now_local"], is_12h))
@@ -774,7 +789,8 @@ if HAS_QT:
                 f"QFrame#MarketCard {{ background: {bg};"
                 f" border: {bw} solid {bd}; border-radius: 10px; }}"
                 f"QFrame#MarketCard:hover {{ border: 1px solid {t['card_border_hover']}; }}")
-            self.ring.set_state(status.get("progress", 0.0), is_open, t)
+            self.ring.set_state(status.get("progress", 0.0), is_open, t,
+                                theme_name)
 else:
     class MarketCardWidget:  # type: ignore
         def __init__(self, *a, **k):
@@ -1218,7 +1234,7 @@ class SessionPanel(QWidget):
             f" border: 1px solid {t['input_border']}; border-radius: 12px; }}"
             f"QFrame#SummaryDivider {{ background: {t['divider']}; }}")
         self.next_countdown.setStyleSheet(f"color: {t['cyan']};")
-        self.open_count.setStyleSheet(f"color: {t['green']};")
+        self.open_count.setStyleSheet(f"color: {spec_green(self._theme)};")
 
         # chips: impact colors tinted when checked. The checked color comes
         # from IMPACT_STYLE for the active theme — the same table the row
@@ -1251,8 +1267,9 @@ class SessionPanel(QWidget):
         brighten = bool(self.c.settings.get("active_brighten", True))
 
         open_sessions = [s for s in statuses if s["is_open"]]
+        open_green = spec_green(self._theme)
         self.open_count.setText(str(len(open_sessions)))
-        self.open_count.setStyleSheet(f"color: {t['green']};")
+        self.open_count.setStyleSheet(f"color: {open_green};")
         self.open_detail.setText(
             ", ".join(s["market"]["symbol"] for s in open_sessions) or "No major session open")
         self.open_detail.setStyleSheet(f"color: {t['secondary']};")
@@ -1271,7 +1288,8 @@ class SessionPanel(QWidget):
         for s in statuses:
             mid = s["market"]["id"]
             if mid in self.cards:
-                self.cards[mid].update_data(s, t, mid == sel_id, is_12h, brighten)
+                self.cards[mid].update_data(s, t, mid == sel_id, is_12h,
+                                            brighten, self._theme)
 
         self.bell_btn.setText("🔔" if self.c.settings.get("alerts_enabled", True) else "🔕")
 
