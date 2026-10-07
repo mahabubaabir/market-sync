@@ -150,21 +150,24 @@ def _event_dt(e: dict) -> datetime | None:
     return _parse_date(e.get("date_utc") or "")
 
 
-def _impact_included(impact: str, min_rank: int, active: set | None) -> bool:
-    """v0.2 multi-select chips: any ticked levels pass; holidays only when All."""
+def _impact_included(impact: str, active: set | None) -> bool:
+    """Multi-select chips: any ticked levels pass; holidays only when All.
+
+    With no active set (should not happen — callers always pass the
+    settings list), fall back to Low-and-above like the old default.
+    """
     if active is not None:
         if impact == "Holiday":
             return len(active) == 3
         return impact in active
-    return IMPACT_RANK.get(impact, 0) >= min_rank
+    return IMPACT_RANK.get(impact, 0) >= IMPACT_RANK["Low"]
 
 
 def filter_events(events: list[dict], currencies: list[str] | None = None,
-                  min_impact: str = "Low", hours_ahead: int = 72,
+                  hours_ahead: int = 72,
                   now_utc: datetime | None = None,
                   active_impacts: list[str] | None = None) -> list[dict]:
     now_utc = now_utc or datetime.now(timezone.utc)
-    min_rank = IMPACT_RANK.get(min_impact, 0)
     active = set(active_impacts) if active_impacts else None
     cur = {c.upper() for c in (currencies or [])}
     out = []
@@ -178,7 +181,7 @@ def filter_events(events: list[dict], currencies: list[str] | None = None,
             continue
         if cur and e.get("currency", "").upper() not in cur:
             continue
-        if not _impact_included(e.get("impact", ""), min_rank, active):
+        if not _impact_included(e.get("impact", ""), active):
             continue
         out.append({**e, "_dt": dt})
     out.sort(key=lambda e: e["_dt"])
@@ -186,10 +189,9 @@ def filter_events(events: list[dict], currencies: list[str] | None = None,
 
 
 def next_event(events: list[dict], currencies: list[str] | None = None,
-               min_impact: str = "Low",
                now_utc: datetime | None = None,
                active_impacts: list[str] | None = None) -> dict | None:
-    upcoming = filter_events(events, currencies, min_impact, hours_ahead=24 * 7,
+    upcoming = filter_events(events, currencies, hours_ahead=24 * 7,
                              now_utc=now_utc, active_impacts=active_impacts)
     return upcoming[0] if upcoming else None
 
@@ -218,7 +220,7 @@ def upcoming_events(events: list[dict], currencies: list[str] | None = None,
             continue
         if cur and e.get("currency", "").upper() not in cur:
             continue
-        if not _impact_included(e.get("impact", ""), 0, active):
+        if not _impact_included(e.get("impact", ""), active):
             continue
         out.append({**e, "_dt": dt})
     out.sort(key=lambda e: e["_dt"])

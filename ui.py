@@ -452,26 +452,11 @@ def _write_panel_status(statuses, settings, now_utc, last: dict) -> dict:
     return payload
 
 
-def tray_label_text(selected: dict, nxt, settings: dict, now_utc) -> str:
-    """Single-market tray text: 'LON +02:14:33 14:32' (+ next event badge)."""
+def tray_label_text(selected: dict) -> str:
+    """Single-market tray text, fixed format: 'LON +02:14:33'."""
     m = selected["market"]
-    is_12h = settings.get("time_format", "24h") == "12h"
-    parts: list[str] = []
-    if settings.get("show_symbol", True):
-        parts.append(m["symbol"])
-    if settings.get("show_countdown", True):
-        parts.append(engine.format_signed_countdown(
-            selected["countdown"], selected["is_open"], include_seconds=True))
-    if settings.get("show_local_time", True):
-        parts.append(engine.format_local_clock(selected["now_local"], is_12h))
-    text = " ".join(parts) or m["symbol"]
-    if settings.get("show_next_event", True) and nxt and nxt.get("_dt"):
-        mins = int((nxt["_dt"] - now_utc).total_seconds() // 60)
-        if 0 <= mins < 60:
-            text += f"  •  {nxt['currency']} {mins}m"
-        elif 60 <= mins < 60 * 24:
-            text += f"  •  {nxt['currency']} {mins // 60}h"
-    return text
+    return (f"{m['symbol']} "
+            f"{engine.format_signed_countdown(selected['countdown'], selected['is_open'], include_seconds=True)}")
 
 
 def make_tray_icon(text: str, is_open: bool, theme: str) -> "QIcon":
@@ -1296,7 +1281,7 @@ class SessionPanel(QWidget):
         active = list(self.c.settings.get("active_impacts", ["High", "Medium", "Low"]))
         self.drawer.sync_chips(active)
         shown = calendar_api.filter_events(
-            news, self.c.settings["currencies"], None, 72, now_utc,
+            news, self.c.settings["currencies"], 72, now_utc,
             active_impacts=active)
         mode = "window"
         if not shown:
@@ -1464,6 +1449,13 @@ if HAS_QT:
             self.alerts_chk = QCheckBox("Desktop notifications")
             self.alerts_chk.setChecked(bool(s.get("alerts_enabled", True)))
             form.addWidget(self.alerts_chk)
+            self.alertmin_cb = QComboBox()
+            for minutes in (5, 10, 15, 30):
+                self.alertmin_cb.addItem(f"{minutes} minutes before", minutes)
+            cur_alert = int(s.get("alert_minutes_before", 5))
+            idx = [i for i, mm in enumerate((5, 10, 15, 30)) if mm == cur_alert]
+            self.alertmin_cb.setCurrentIndex(idx[0] if idx else 0)
+            row("Alert me", self.alertmin_cb)
 
             # ---- window & startup
             section("Window & Startup")
@@ -1477,6 +1469,10 @@ if HAS_QT:
                 self.sel_cb.addItem(f"{m['flag']}  {m['name']}", m["id"])
             self.sel_cb.setCurrentIndex(MARKET_IDS.index(s.get("selected_market", "LONDON")))
             row("Default market", self.sel_cb)
+            self.seg_leftclick = self._seg(
+                [("panel", "Open panel"), ("menu", "Open menu")],
+                s.get("left_click_action", "panel"), preview=False)
+            row("Left-click icon", self.seg_leftclick)
             self.drawer_chk = QCheckBox("Open Up Next drawer by default")
             self.drawer_chk.setChecked(bool(s.get("news_drawer_expanded", True)))
             form.addWidget(self.drawer_chk)
@@ -1665,8 +1661,10 @@ if HAS_QT:
                 mid: self._seg_value(seg, "panel") for mid, seg in self.route_segs.items()}
             s["theme"] = self.theme_cb.currentData()
             s["alerts_enabled"] = self.alerts_chk.isChecked()
+            s["alert_minutes_before"] = self.alertmin_cb.currentData()
             s["start_hidden"] = self.hidden_chk.isChecked()
             s["selected_market"] = self.sel_cb.currentData()
+            s["left_click_action"] = self._seg_value(self.seg_leftclick, "panel")
             s["news_refresh_minutes"] = self.refresh_cb.currentData()
             s["news_drawer_expanded"] = self.drawer_chk.isChecked()
             s["auto_hide_panel"] = self.autohide_chk.isChecked()
@@ -2244,7 +2242,7 @@ class TrayController:
             note = self.news_note
         active = self.settings.get("active_impacts", ["High", "Medium", "Low"])
         nxt = calendar_api.next_event(
-            events, self.settings["currencies"], None, now_utc, active_impacts=active)
+            events, self.settings["currencies"], now_utc, active_impacts=active)
 
         # -- Cinnamon applet status file
         try:
@@ -2269,7 +2267,7 @@ class TrayController:
                         self.tray.setIcon(make_tray_icon_multi(segs, theme))
                     self._last_tray_key = key
             else:
-                label = tray_label_text(self.selected, nxt, self.settings, now_utc)
+                label = tray_label_text(self.selected)
                 is_open = bool(self.selected["is_open"])
                 key = ("s", label, style, theme, is_open)
                 if key != self._last_tray_key:

@@ -111,11 +111,9 @@ ALL_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD"]
 
 DEFAULT_SETTINGS = {
     "selected_market": "LONDON",
-    "time_mode": "market_local",  # market_local | local
     "currencies": ["USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD"],
     # v0.2-style multi-select impact chips (All = every level ticked).
     "active_impacts": ["High", "Medium", "Low"],
-    "min_impact": "All",  # legacy fallback kept for compatibility
     "alerts_enabled": True,
     "alert_minutes_before": 5,
     "news_refresh_minutes": 15,
@@ -139,10 +137,6 @@ DEFAULT_SETTINGS = {
         "LONDON": "panel", "NEW_YORK": "panel", "SYDNEY": "panel",
         "TOKYO": "panel", "NYSE": "panel",
     },
-    "show_symbol": True,
-    "show_countdown": True,
-    "show_local_time": True,
-    "show_next_event": True,
     "left_click_action": "panel",  # panel | menu
     "start_hidden": False,
     "auto_hide_panel": True,
@@ -252,10 +246,6 @@ def load_settings() -> dict:
                 "system", "light", "dark", "dark_purple", "mint_light", "mint_dark"
             ):
                 settings["theme"] = "system"
-            if settings.get("time_mode") not in ("market_local", "local", "system"):
-                settings["time_mode"] = "market_local"
-            if settings.get("time_mode") == "system":
-                settings["time_mode"] = "local"
             if settings.get("time_format") not in ("12h", "24h"):
                 settings["time_format"] = "24h"
             if settings.get("tray_mode") not in ("multi", "single"):

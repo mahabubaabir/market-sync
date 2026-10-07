@@ -261,20 +261,3 @@ def format_local_clock(dt: datetime, is_12h: bool = False) -> str:
     if is_12h:
         return dt.strftime("%I:%M %p").lstrip("0")
     return dt.strftime("%H:%M")
-
-
-def overlap_count(statuses: list[dict] | None = None) -> int:
-    if statuses is None:
-        statuses = get_all_statuses()
-    return sum(1 for s in statuses if s["is_open"])
-
-
-def summary_line(status: dict, time_mode: str = "market_local") -> str:
-    m = status["market"]
-    state = "OPEN" if status["is_open"] else "CLOSED"
-    cd = format_countdown(status["countdown"])
-    if time_mode == "market_local":
-        clock = status["now_local"].strftime("%H:%M:%S") + f" {m['symbol']}-local"
-    else:
-        clock = datetime.now().astimezone().strftime("%H:%M:%S") + " local"
-    return f"{m['symbol']} {state} {status['next_label']} in {cd}  •  {clock}"
