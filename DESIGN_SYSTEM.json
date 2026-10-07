@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "name": "Market Sync Design System & Technical Specification",
-  "version": "1.4.6",
+  "version": "1.5.0",
   "specificationVersion": "2.0.0",
   "project": {
     "name": "Market Sync",
@@ -220,9 +220,9 @@
         "elements": [
           "Transparent twin-arrow app icon (20px, assets/icon.svg)",
           "MARKET SYNC uppercase title",
-          "Drawer collapse/expand button (▾ / ▴)",
-          "Notification toggle bell button (🔔)",
-          "Preferences gear icon button (⚙️)"
+          "Drawer collapse/expand button (\u25be / \u25b4)",
+          "Notification toggle bell button (\ud83d\udd14)",
+          "Preferences gear icon button (\u2699\ufe0f)"
         ]
       },
       "newsDrawer": {
@@ -230,9 +230,9 @@
           "title": "UP NEXT",
           "filterChips": [
             "All",
-            "🔴 High",
-            "🟠 Med",
-            "🟡 Low"
+            "\ud83d\udd34 High",
+            "\ud83d\udfe0 Med",
+            "\ud83d\udfe1 Low"
           ]
         },
         "scrollArea": {
@@ -253,7 +253,7 @@
         },
         "bottomBar": {
           "dateLabel": "e.g., '19 Sep'",
-          "collapseButton": "▴"
+          "collapseButton": "\u25b4"
         }
       },
       "preferencesWindow": {
@@ -274,7 +274,10 @@
     "brandLogo": {
       "concept": "Two bold folded arrows, 180 degrees apart, chasing each other round a transparent ring. Rebuilt in v1.4.3 for 16px legibility: 28-unit thick bands, blunt heads, 42-degree gaps, soft dark keyline.",
       "viewBox": "0 0 100 100",
-      "files": ["assets/icon.svg", "assets/logo.svg"],
+      "files": [
+        "assets/icon.svg",
+        "assets/logo.svg"
+      ],
       "smallSizeNotes": {
         "bandThickness": 28,
         "outerRadius": 47,
@@ -339,7 +342,23 @@
         "description": "Traditional Japanese Shinto shrine gate with dual pillars and lintel beams",
         "accentColor": "#ff6b6b"
       }
-    }
+    },
+    "version": "v2.1 Command-Center",
+    "openGreenRule": {
+      "dark": "#30d158",
+      "light": "#16a34a",
+      "note": "Fixed spec green for OPEN indicators everywhere (applet, tray, flow chips, open count, rings), independent of the app theme."
+    },
+    "pillShapeRule": "Qt paints opaque QSS backgrounds square, ignoring border-radius. All capsule labels use WA_TranslucentBackground (pill_label()).",
+    "currencyPalette": "per-variant (bright on dark, deep on light) via currency_color()",
+    "removedSettings": [
+      "time_mode",
+      "min_impact",
+      "show_symbol",
+      "show_countdown",
+      "show_local_time",
+      "show_next_event"
+    ]
   },
   "cinnamonAppletSpecification": {
     "uuid": "market-sync@cinnamon",
@@ -352,10 +371,10 @@
     },
     "markup": {
       "pangoEnabled": true,
-      "activeSessionFormat": "<span weight=\"bold\" foreground=\"#30d158\">● {SYMBOL} {COUNTDOWN}</span>",
-      "closedSessionFormat": "<span foreground=\"#cbd5e1\">○ {SYMBOL} {COUNTDOWN}</span>",
+      "activeSessionFormat": "<span weight=\"bold\" foreground=\"#30d158\">\u25cf {SYMBOL} {COUNTDOWN}</span>",
+      "closedSessionFormat": "<span foreground=\"#cbd5e1\">\u25cb {SYMBOL} {COUNTDOWN}</span>",
       "separator": "  ",
-      "sample": "<span weight=\"bold\" foreground=\"#30d158\">● LON +04:05</span>  <span foreground=\"#cbd5e1\">○ NYC -00:35</span>"
+      "sample": "<span weight=\"bold\" foreground=\"#30d158\">\u25cf LON +04:05</span>  <span foreground=\"#cbd5e1\">\u25cb NYC -00:35</span>"
     },
     "statusFileLocation": "~/.cache/market-sync/panel_status.json",
     "statusFileSchema": {
@@ -381,65 +400,65 @@
       "id": "LONDON",
       "name": "London",
       "symbol": "LON",
-      "flag": "🇬🇧",
+      "flag": "\ud83c\uddec\ud83c\udde7",
       "landmark": "london",
       "timezone": "Europe/London",
       "openLocal": "08:00",
       "closeLocal": "16:30",
       "type": "fx",
-      "utcHint": "07:00–16:00 UTC",
+      "utcHint": "07:00\u201316:00 UTC",
       "color": "#8ecd76"
     },
     {
       "id": "NEW_YORK",
       "name": "New York",
       "symbol": "NYC",
-      "flag": "🇺🇸",
+      "flag": "\ud83c\uddfa\ud83c\uddf8",
       "landmark": "new_york",
       "timezone": "America/New_York",
       "openLocal": "08:00",
       "closeLocal": "17:00",
       "type": "fx",
-      "utcHint": "12:00–21:00 UTC",
+      "utcHint": "12:00\u201321:00 UTC",
       "color": "#c792ea"
     },
     {
       "id": "SYDNEY",
       "name": "Sydney",
       "symbol": "SYD",
-      "flag": "🇦🇺",
+      "flag": "\ud83c\udde6\ud83c\uddfa",
       "landmark": "sydney",
       "timezone": "Australia/Sydney",
       "openLocal": "07:00",
       "closeLocal": "16:00",
       "type": "fx",
-      "utcHint": "21:00–06:00 UTC",
+      "utcHint": "21:00\u201306:00 UTC",
       "color": "#4da3ff"
     },
     {
       "id": "TOKYO",
       "name": "Tokyo",
       "symbol": "TYO",
-      "flag": "🇯🇵",
+      "flag": "\ud83c\uddef\ud83c\uddf5",
       "landmark": "tokyo",
       "timezone": "Asia/Tokyo",
       "openLocal": "09:00",
       "closeLocal": "18:00",
       "type": "fx",
-      "utcHint": "00:00–09:00 UTC",
+      "utcHint": "00:00\u201309:00 UTC",
       "color": "#ff6b6b"
     },
     {
       "id": "NYSE",
       "name": "NYSE",
       "symbol": "NYSE",
-      "flag": "🗽",
+      "flag": "\ud83d\uddfd",
       "landmark": "new_york",
       "timezone": "America/New_York",
       "openLocal": "09:30",
       "closeLocal": "16:00",
       "type": "equity",
-      "utcHint": "13:30–20:00 UTC",
+      "utcHint": "13:30\u201320:00 UTC",
       "color": "#ffcb6b",
       "calendar": "NYSE"
     }

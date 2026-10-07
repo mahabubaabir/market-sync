@@ -12,7 +12,7 @@ economic calendar.
 
 ## Install (one command)
 
-Latest release: **v1.4.6** — older `.deb` releases were pruned, so always
+Latest release: **v1.5.0** — older `.deb` releases were pruned, so always
 install the newest asset from the
 [Releases page](https://github.com/mahabubaabir/market-sync/releases).
 
@@ -28,9 +28,11 @@ cd /opt/market-sync && ./install-applet.sh
 ```
 
 - **Launch:** `market-sync` (or Super → "Market Sync")
-- **Top panel applet (text-only):** `● LON +04:05  ○ NYC -00:35` — bright
-  green when open, silvery when closed. **Left-click opens the same panel
-  as the tray icon.** Right-click: Toggle Panel / Preferences… / Quit
+- **Top panel applet (text-only):** `● LON +04:05  ○ NYC -00:35` — fixed
+  spec green when open, silvery when closed. **Left-click opens the same
+  panel as the tray icon.** Right-click: Toggle Panel / Preferences… / Quit
+- **Command-center panel:** markets-open summary + next event, session-flow
+  strip, 2-column market cards, Up Next news with weekend/off-day cover
 - **Standalone tray:** bold two-folded-arrow logo with a green/grey status dot
   (default; switch to the live `text` strip under Preferences → Tray icon)
 - **IPC:** `market-sync --toggle` · `--show` · `--hide` · `--preferences` · `--quit`

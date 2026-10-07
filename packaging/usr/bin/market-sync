@@ -3,7 +3,13 @@
 # - Detaches from the terminal so closing it never kills the app.
 # - Restarts after a crash (up to 3 times); clean quit ends the loop.
 APP_DIR="/opt/market-sync"
-LOG_DIR="$HOME/.cache/market-sync"
+# Never write the log into another user's $HOME when elevated (a root-owned
+# log would break later user writes); root gets its own cache dir.
+if [ "$(id -u)" = "0" ]; then
+  LOG_DIR="/root/.cache/market-sync"
+else
+  LOG_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/market-sync"
+fi
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOG="$LOG_DIR/app.log"
 

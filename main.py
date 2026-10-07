@@ -37,7 +37,7 @@ def run_cli(args) -> int:
                 dot = "🟢" if s["is_open"] else "⚪"
                 lines.append(f"{mark} {dot} {s['market']['symbol']:5s} {s['market']['name']:14s} "
                              f"{'OPEN ' if s['is_open'] else 'SHUT '} {s['next_label']:6s} {engine.format_countdown(s['countdown'])}")
-            nxt = calendar_api.next_event(events, settings["currencies"], settings["min_impact"], now,
+            nxt = calendar_api.next_event(events, settings["currencies"], now,
                                           settings.get("active_impacts"))
             print("\033c", end="")
             print(f"{APP_NAME} — {sel['market']['name']} {'OPEN' if sel['is_open'] else 'CLOSED'} "
@@ -156,7 +156,15 @@ def run_gui(args) -> int:
     # --hidden (autostart/background) or saved start_hidden -> tray only.
     # Note: we do NOT persist --hidden into settings, so manual launches
     # stay visible unless the user explicitly ticks "Start hidden in tray".
-    hidden_launch = bool(getattr(args, "hidden", False)) or settings.get("start_hidden", False)
+    # Explicit panel commands must open visibly even when normal manual
+    # launches are configured to start hidden in the tray.
+    explicit_visible = bool(
+        getattr(args, "toggle", False) or getattr(args, "show", False)
+        or getattr(args, "open_prefs", False)
+    )
+    hidden_launch = bool(getattr(args, "hidden", False)) or (
+        settings.get("start_hidden", False) and not explicit_visible
+    )
     if not hidden_launch:
         ctl.toggle_panel()
     if getattr(args, "open_prefs", False):
