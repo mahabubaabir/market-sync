@@ -4,6 +4,32 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.5.0 — 2026-10-07 — Command-center redesign + reliability merge
+
+**Git reconciliation**
+- Merged `origin/main` (PR #1): DST-safe countdowns, NYSE 2028 exception,
+  atomic news-cache writes, strict impact validation, `tests/` + CI.
+- Completed `redesign/market-sync-command-center`: 470px panel, summary
+  card (open count + next event with off-day fallback), SESSION FLOW strip,
+  104px cards, explicit-command visibility with `start_hidden`.
+
+**Fixed spec green** — open sessions render `#30d158` (dark) / `#16a34a`
+(light) in the applet, tray text, flow chips, open count and rings,
+independent of the app theme (per-theme markup assertions).
+
+**Settings cull** — removed `time_mode`, `min_impact`, `show_symbol`,
+`show_countdown`, `show_local_time`, `show_next_event` (single tray is now
+fixed `SYM +COUNTDOWN`); exposed alert timing + left-click in Preferences.
+
+**Eye-soothing v2.1 tokens** — deepened backgrounds, softened accents,
+hairline borders, warm light surfaces; machine-audited contrast (body
+≥ 4.5, accents ≥ 3) on all five themes; theme-aware currency palette;
+panel drop shadow + 150ms fade-in; `Esc` hides the panel.
+
+**Bug audit** — updater is pkexec-only (no silent `sudo -n` failure);
+cooperative news-thread shutdown; launcher log dir is root-safe;
+regrouped tray menu; every settings key has a Preferences control.
+
 ### v1.4.6 — 2026-10-04 — Pill shapes + off-day upcoming news
 
 **Design inconsistency: news pills rendered as sharp boxes (light themes)**

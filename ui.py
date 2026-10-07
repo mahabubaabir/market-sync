@@ -57,156 +57,158 @@ CYAN = "#38bdf8"    # brand cyan
 
 ASSETS_DIR = os.path.join(app_dir(), "assets")
 
-# ----------------------------------------------------------------- v2.0 tokens
-# Material UI frosted glass: translucent surfaces, neon active highlights,
-# crisp silvery muted off-states. Purple/Mint follow the same token shape.
+# ----------------------------------------------------------------- v2.1 tokens
+# Eye-soothing frosted glass: deep calm surfaces, softened accents, hairline
+# borders. Green means open/live, silver means closed; impact color lives in
+# the news drawer only. Body text targets >= 4.5:1 contrast on every theme.
 THEMES = {
     "dark": {
-        "bg": "rgba(16, 20, 30, 0.88)",
-        "border": "rgba(255, 255, 255, 0.08)",
-        "card": "rgba(28, 34, 48, 0.70)",
-        "card_active": "rgba(20, 42, 30, 0.65)",
-        "card_border": "rgba(255, 255, 255, 0.06)",
-        "card_border_active": "#30d158",
-        "card_border_hover": "rgba(255, 255, 255, 0.16)",
-        "text": "#f1f5f9",
-        "secondary": "#94a3b8",
-        "muted": "#64748b",
-        "green": "#30d158",
-        "cyan": "#38bdf8",
-        "closed": "#cbd5e1",
-        "divider": "rgba(255, 255, 255, 0.08)",
-        "ring_track": "rgba(255, 255, 255, 0.12)",
+        "bg": "rgba(13, 17, 25, 0.92)",
+        "border": "rgba(255, 255, 255, 0.06)",
+        "card": "rgba(24, 30, 42, 0.72)",
+        "card_active": "rgba(22, 40, 30, 0.66)",
+        "card_border": "rgba(255, 255, 255, 0.05)",
+        "card_border_active": "#3ecf8e",
+        "card_border_hover": "rgba(255, 255, 255, 0.12)",
+        "text": "#e8edf3",
+        "secondary": "#9aa7ba",
+        "muted": "#6b7a90",
+        "green": "#3ecf8e",
+        "cyan": "#5bb8dd",
+        "closed": "#c3ccd8",
+        "divider": "rgba(255, 255, 255, 0.06)",
+        "ring_track": "rgba(255, 255, 255, 0.10)",
         "row_bg": "rgba(255, 255, 255, 0.03)",
         "row_border": "rgba(255, 255, 255, 0.04)",
-        "input_bg": "rgba(255, 255, 255, 0.06)",
-        "input_hover": "rgba(255, 255, 255, 0.10)",
-        "input_selected": "rgba(56, 189, 248, 0.22)",
-        "input_border": "rgba(255, 255, 255, 0.12)",
-        "input_border_selected": "#38bdf8",
-        "badge_bg": "rgba(34, 40, 58, 0.85)",
-        "solid_bg": "#12161f",
+        "input_bg": "rgba(255, 255, 255, 0.05)",
+        "input_hover": "rgba(255, 255, 255, 0.08)",
+        "input_selected": "rgba(91, 184, 221, 0.20)",
+        "input_border": "rgba(255, 255, 255, 0.10)",
+        "input_border_selected": "#5bb8dd",
+        "badge_bg": "rgba(30, 36, 52, 0.85)",
+        "solid_bg": "#0f141d",
         "tray_text": "#ffffff",
-        "pill_open_bg": "rgba(48, 209, 88, 0.18)", "pill_open_text": "#30d158",
-        "pill_closed_bg": "rgba(203, 213, 225, 0.10)", "pill_closed_text": "#cbd5e1",
+        "pill_open_bg": "rgba(62, 207, 142, 0.16)", "pill_open_text": "#3ecf8e",
+        "pill_closed_bg": "rgba(195, 204, 216, 0.10)", "pill_closed_text": "#c3ccd8",
     },
     "light": {
-        "bg": "rgba(250, 252, 255, 0.88)",
-        "border": "rgba(0, 0, 0, 0.08)",
-        "card": "rgba(255, 255, 255, 0.85)",
-        "card_active": "rgba(236, 253, 245, 0.90)",
-        "card_border": "rgba(0, 0, 0, 0.06)",
-        "card_border_active": "#16a34a",
-        "card_border_hover": "rgba(0, 0, 0, 0.14)",
-        "text": "#0f172a",
-        "secondary": "#475569",
-        "muted": "#94a3b8",
-        "green": "#16a34a",
-        "cyan": "#0284c7",
-        "closed": "#334155",
-        "divider": "rgba(0, 0, 0, 0.08)",
-        "ring_track": "rgba(0, 0, 0, 0.10)",
-        "row_bg": "rgba(0, 0, 0, 0.03)",
-        "row_border": "rgba(0, 0, 0, 0.05)",
-        "input_bg": "rgba(0, 0, 0, 0.04)",
-        "input_hover": "rgba(0, 0, 0, 0.07)",
-        "input_selected": "rgba(2, 132, 199, 0.16)",
-        "input_border": "rgba(0, 0, 0, 0.12)",
-        "input_border_selected": "#0284c7",
-        "badge_bg": "rgba(241, 245, 249, 0.90)",
-        "solid_bg": "#f7f9fc",
-        "tray_text": "#0f172a",
-        "pill_open_bg": "rgba(22, 163, 74, 0.14)", "pill_open_text": "#16a34a",
-        "pill_closed_bg": "rgba(51, 65, 85, 0.10)", "pill_closed_text": "#334155",
+        "bg": "rgba(250, 249, 246, 0.93)",
+        "border": "rgba(30, 25, 20, 0.08)",
+        "card": "rgba(255, 255, 255, 0.88)",
+        "card_active": "rgba(232, 245, 238, 0.92)",
+        "card_border": "rgba(30, 25, 20, 0.06)",
+        "card_border_active": "#159a6c",
+        "card_border_hover": "rgba(30, 25, 20, 0.12)",
+        "text": "#1c2420",
+        "secondary": "#55605a",
+        "muted": "#6f7a74",
+        "green": "#159a6c",
+        "cyan": "#0369a1",
+        "closed": "#3d4a44",
+        "divider": "rgba(30, 25, 20, 0.07)",
+        "ring_track": "rgba(30, 25, 20, 0.10)",
+        "row_bg": "rgba(30, 25, 20, 0.03)",
+        "row_border": "rgba(30, 25, 20, 0.05)",
+        "input_bg": "rgba(30, 25, 20, 0.04)",
+        "input_hover": "rgba(30, 25, 20, 0.07)",
+        "input_selected": "rgba(3, 105, 161, 0.14)",
+        "input_border": "rgba(30, 25, 20, 0.11)",
+        "input_border_selected": "#0369a1",
+        "badge_bg": "rgba(238, 234, 226, 0.92)",
+        "solid_bg": "#faf8f4",
+        "tray_text": "#1c2420",
+        "pill_open_bg": "rgba(21, 154, 108, 0.12)", "pill_open_text": "#0f7a57",
+        "pill_closed_bg": "rgba(61, 74, 68, 0.08)", "pill_closed_text": "#3d4a44",
     },
     "dark_purple": {
-        "bg": "rgba(24, 19, 36, 0.88)",
-        "border": "rgba(255, 255, 255, 0.08)",
-        "card": "rgba(38, 31, 54, 0.70)",
-        "card_active": "rgba(28, 44, 34, 0.65)",
-        "card_border": "rgba(255, 255, 255, 0.06)",
-        "card_border_active": "#35c48d",
-        "card_border_hover": "rgba(255, 255, 255, 0.16)",
-        "text": "#ece7f6",
-        "secondary": "#a99fc4",
-        "muted": "#7d7396",
-        "green": "#35c48d",
+        "bg": "rgba(20, 16, 32, 0.92)",
+        "border": "rgba(255, 255, 255, 0.06)",
+        "card": "rgba(33, 27, 48, 0.72)",
+        "card_active": "rgba(26, 42, 32, 0.66)",
+        "card_border": "rgba(255, 255, 255, 0.05)",
+        "card_border_active": "#3ed598",
+        "card_border_hover": "rgba(255, 255, 255, 0.12)",
+        "text": "#eae6f4",
+        "secondary": "#a79dc2",
+        "muted": "#7a7094",
+        "green": "#3ed598",
         "cyan": "#a78bfa",
-        "closed": "#cfc7e2",
-        "divider": "rgba(255, 255, 255, 0.08)",
-        "ring_track": "rgba(255, 255, 255, 0.12)",
+        "closed": "#cdc5e0",
+        "divider": "rgba(255, 255, 255, 0.06)",
+        "ring_track": "rgba(255, 255, 255, 0.10)",
         "row_bg": "rgba(255, 255, 255, 0.03)",
         "row_border": "rgba(255, 255, 255, 0.04)",
-        "input_bg": "rgba(255, 255, 255, 0.06)",
-        "input_hover": "rgba(255, 255, 255, 0.10)",
-        "input_selected": "rgba(167, 139, 250, 0.22)",
-        "input_border": "rgba(255, 255, 255, 0.12)",
+        "input_bg": "rgba(255, 255, 255, 0.05)",
+        "input_hover": "rgba(255, 255, 255, 0.08)",
+        "input_selected": "rgba(167, 139, 250, 0.20)",
+        "input_border": "rgba(255, 255, 255, 0.10)",
         "input_border_selected": "#a78bfa",
-        "badge_bg": "rgba(46, 36, 66, 0.85)",
-        "solid_bg": "#1a1428",
-        "tray_text": "#ece7f6",
-        "pill_open_bg": "rgba(53, 196, 141, 0.18)", "pill_open_text": "#35c48d",
-        "pill_closed_bg": "rgba(207, 199, 226, 0.10)", "pill_closed_text": "#cfc7e2",
+        "badge_bg": "rgba(41, 32, 60, 0.85)",
+        "solid_bg": "#171224",
+        "tray_text": "#eae6f4",
+        "pill_open_bg": "rgba(62, 213, 152, 0.16)", "pill_open_text": "#3ed598",
+        "pill_closed_bg": "rgba(205, 197, 224, 0.10)", "pill_closed_text": "#cdc5e0",
     },
     "mint_light": {
-        "bg": "rgba(244, 251, 247, 0.88)",
+        "bg": "rgba(246, 250, 246, 0.93)",
         "border": "rgba(16, 43, 35, 0.08)",
-        "card": "rgba(255, 255, 255, 0.85)",
-        "card_active": "rgba(226, 250, 238, 0.90)",
+        "card": "rgba(255, 255, 255, 0.88)",
+        "card_active": "rgba(228, 244, 236, 0.92)",
         "card_border": "rgba(16, 43, 35, 0.06)",
-        "card_border_active": "#10b981",
-        "card_border_hover": "rgba(16, 43, 35, 0.14)",
-        "text": "#0f2a1f",
-        "secondary": "#3f6b58",
-        "muted": "#7fa392",
-        "green": "#10b981",
-        "cyan": "#0d9488",
+        "card_border_active": "#0e9e6e",
+        "card_border_hover": "rgba(16, 43, 35, 0.12)",
+        "text": "#10241d",
+        "secondary": "#43655a",
+        "muted": "#658377",
+        "green": "#0e9e6e",
+        "cyan": "#0b7d74",
         "closed": "#33594a",
-        "divider": "rgba(16, 43, 35, 0.08)",
+        "divider": "rgba(16, 43, 35, 0.07)",
         "ring_track": "rgba(16, 43, 35, 0.10)",
         "row_bg": "rgba(16, 43, 35, 0.03)",
         "row_border": "rgba(16, 43, 35, 0.05)",
-        "input_bg": "rgba(16, 43, 35, 0.05)",
-        "input_hover": "rgba(16, 43, 35, 0.08)",
-        "input_selected": "rgba(16, 185, 129, 0.18)",
-        "input_border": "rgba(16, 43, 35, 0.12)",
-        "input_border_selected": "#10b981",
-        "badge_bg": "rgba(226, 245, 234, 0.90)",
-        "solid_bg": "#f2faf5",
-        "tray_text": "#0f2a1f",
-        "pill_open_bg": "rgba(16, 185, 129, 0.14)", "pill_open_text": "#059669",
-        "pill_closed_bg": "rgba(51, 89, 74, 0.10)", "pill_closed_text": "#33594a",
+        "input_bg": "rgba(16, 43, 35, 0.04)",
+        "input_hover": "rgba(16, 43, 35, 0.07)",
+        "input_selected": "rgba(14, 158, 110, 0.14)",
+        "input_border": "rgba(16, 43, 35, 0.11)",
+        "input_border_selected": "#0e9e6e",
+        "badge_bg": "rgba(228, 242, 232, 0.92)",
+        "solid_bg": "#f4faf6",
+        "tray_text": "#10241d",
+        "pill_open_bg": "rgba(14, 158, 110, 0.12)", "pill_open_text": "#0b7a58",
+        "pill_closed_bg": "rgba(51, 89, 74, 0.08)", "pill_closed_text": "#33594a",
     },
     "mint_dark": {
-        "bg": "rgba(18, 29, 24, 0.88)",
-        "border": "rgba(255, 255, 255, 0.08)",
-        "card": "rgba(31, 45, 38, 0.70)",
-        "card_active": "rgba(22, 48, 36, 0.65)",
-        "card_border": "rgba(255, 255, 255, 0.06)",
-        "card_border_active": "#35c48d",
-        "card_border_hover": "rgba(255, 255, 255, 0.16)",
-        "text": "#e3f0e9",
-        "secondary": "#9fc0af",
-        "muted": "#6f8f7f",
-        "green": "#35c48d",
-        "cyan": "#2dd4bf",
-        "closed": "#c6dccf",
-        "divider": "rgba(255, 255, 255, 0.08)",
-        "ring_track": "rgba(255, 255, 255, 0.12)",
+        "bg": "rgba(15, 25, 21, 0.92)",
+        "border": "rgba(255, 255, 255, 0.06)",
+        "card": "rgba(27, 40, 34, 0.72)",
+        "card_active": "rgba(24, 44, 34, 0.66)",
+        "card_border": "rgba(255, 255, 255, 0.05)",
+        "card_border_active": "#3ecf8e",
+        "card_border_hover": "rgba(255, 255, 255, 0.12)",
+        "text": "#e2efe8",
+        "secondary": "#9dbdae",
+        "muted": "#6d8d7e",
+        "green": "#3ecf8e",
+        "cyan": "#4fd8c4",
+        "closed": "#c4dad0",
+        "divider": "rgba(255, 255, 255, 0.06)",
+        "ring_track": "rgba(255, 255, 255, 0.10)",
         "row_bg": "rgba(255, 255, 255, 0.03)",
         "row_border": "rgba(255, 255, 255, 0.04)",
-        "input_bg": "rgba(255, 255, 255, 0.06)",
-        "input_hover": "rgba(255, 255, 255, 0.10)",
-        "input_selected": "rgba(53, 196, 141, 0.22)",
-        "input_border": "rgba(255, 255, 255, 0.12)",
-        "input_border_selected": "#35c48d",
-        "badge_bg": "rgba(36, 54, 44, 0.85)",
-        "solid_bg": "#121d18",
-        "tray_text": "#e3f0e9",
-        "pill_open_bg": "rgba(53, 196, 141, 0.18)", "pill_open_text": "#35c48d",
-        "pill_closed_bg": "rgba(198, 220, 207, 0.10)", "pill_closed_text": "#c6dccf",
+        "input_bg": "rgba(255, 255, 255, 0.05)",
+        "input_hover": "rgba(255, 255, 255, 0.08)",
+        "input_selected": "rgba(79, 216, 196, 0.18)",
+        "input_border": "rgba(255, 255, 255, 0.10)",
+        "input_border_selected": "#4fd8c4",
+        "badge_bg": "rgba(32, 48, 40, 0.85)",
+        "solid_bg": "#101a16",
+        "tray_text": "#e2efe8",
+        "pill_open_bg": "rgba(62, 207, 142, 0.16)", "pill_open_text": "#3ecf8e",
+        "pill_closed_bg": "rgba(196, 218, 208, 0.10)", "pill_closed_text": "#c4dad0",
     },
 }
+
 THEMES["system"] = THEMES["dark"]  # placeholder; resolve_theme() maps it
 
 THEME_ORDER = ["system", "light", "dark", "dark_purple", "mint_light", "mint_dark"]
@@ -260,11 +262,25 @@ def spec_green(theme_name: str) -> str:
     """
     return "#16a34a" if impact_variant(theme_name) == "light" else "#30d158"
 
-# v2.0 currency accent palette
+# v2.1 currency accent palette (per-variant: bright on dark, deep on light)
 CURRENCY_COLORS = {
-    "USD": "#38bdf8", "EUR": "#10b981", "GBP": "#c084fc", "JPY": "#f87171",
-    "AUD": "#fb923c", "CAD": "#e879f9", "CHF": "#e2e8f0", "NZD": "#34d399",
+    "USD": {"dark": "#38bdf8", "light": "#0369a1"},
+    "EUR": {"dark": "#10b981", "light": "#0b7a58"},
+    "GBP": {"dark": "#c084fc", "light": "#7c3aed"},
+    "JPY": {"dark": "#f87171", "light": "#b91c1c"},
+    "AUD": {"dark": "#fb923c", "light": "#c2410c"},
+    "CAD": {"dark": "#e879f9", "light": "#a21caf"},
+    "CHF": {"dark": "#e2e8f0", "light": "#475569"},
+    "NZD": {"dark": "#34d399", "light": "#0b7a58"},
 }
+
+
+def currency_color(cur: str, theme_name: str, fallback: str = "#38bdf8") -> str:
+    """Currency pill text color for the active theme variant."""
+    entry = CURRENCY_COLORS.get((cur or "").upper(), {})
+    if isinstance(entry, dict):
+        return entry.get(impact_variant(theme_name), entry.get("dark", fallback))
+    return entry or fallback  # legacy flat entry, if any
 
 _UNSET = object()
 
@@ -337,7 +353,7 @@ QFrame#PanelRoot {{
     border-radius: 14px;
 }}
 QLabel {{ color: {t['text']}; background: transparent; }}
-QLabel.caption {{ color: {t['secondary']}; font-size: 10px; font-weight: 700; letter-spacing: 1.0px; }}
+QLabel.caption {{ color: {t['secondary']}; font-size: 9px; font-weight: 700; letter-spacing: 0.8px; }}
 QFrame#MarketCard {{ border-radius: 14px; }}
 QPushButton.bar {{ background: transparent; color: {t['secondary']}; border: none; border-radius: 6px; padding: 2px 6px; font-size: 13px; }}
 QPushButton.bar:hover {{ color: {t['text']}; background: {t['input_hover']}; }}
@@ -833,7 +849,7 @@ if HAS_QT:
                 "border-radius: 4px; font-weight: bold;")
 
             cur = (ev.get("currency") or ev.get("country") or "").upper()
-            c_fg = CURRENCY_COLORS.get(cur, theme["cyan"])
+            c_fg = currency_color(cur, theme_name, theme["cyan"])
             self.cur_pill.setText(cur[:3])
             self.cur_pill.setStyleSheet(
                 f"background: {theme['input_bg']}; color: {c_fg};"
@@ -1010,11 +1026,20 @@ class SessionPanel(QWidget):
         self.setFixedWidth(470)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setContentsMargins(14, 10, 14, 14)
         outer.setSpacing(0)
         self.root = QFrame()
         self.root.setObjectName("PanelRoot")
         outer.addWidget(self.root)
+        try:
+            from PyQt6.QtWidgets import QGraphicsDropShadowEffect
+            shadow = QGraphicsDropShadowEffect(self.root)
+            shadow.setBlurRadius(22)
+            shadow.setOffset(0, 5)
+            shadow.setColor(QColor(0, 0, 0, 80))
+            self.root.setGraphicsEffect(shadow)
+        except Exception:
+            pass
 
         root = QVBoxLayout(self.root)
         root.setContentsMargins(14, 14, 14, 14)
@@ -1076,6 +1101,7 @@ class SessionPanel(QWidget):
         self.flow_labels = []
         for _ in range(len(MARKETS)):
             lab = QLabel("—")
+            lab.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
             lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lab.setMinimumWidth(60)
             lab.setFont(app_font(8, QFont.Weight.DemiBold))
@@ -1187,6 +1213,15 @@ class SessionPanel(QWidget):
 
     def _sync_drawer_btn(self):
         self.drawer_btn.setText("▴" if self.drawer.isVisible() else "▾")
+
+    def keyPressEvent(self, ev):
+        try:
+            if ev.key() == Qt.Key.Key_Escape:
+                self.hide()
+                return
+        except Exception:
+            pass
+        super().keyPressEvent(ev)
 
     # -- focus behaviour (hide when clicking another app)
     def changeEvent(self, ev):
@@ -1866,10 +1901,21 @@ class TrayController:
             self.menu.addAction(a)
         self.menu.addSeparator()
 
+        # -- actions
+        pn = QAction("Show / hide panel", self.menu)
+        pn.triggered.connect(self.toggle_panel)
+        self.menu.addAction(pn)
+
         pref_a = QAction("⚙️  Preferences…", self.menu)
         pref_a.triggered.connect(self.open_preferences)
         self.menu.addAction(pref_a)
 
+        rn = QAction("Refresh news", self.menu)
+        rn.triggered.connect(lambda: self.refresh_news(force=True))
+        self.menu.addAction(rn)
+        self.menu.addSeparator()
+
+        # -- filters
         active = set(self.settings.get("active_impacts", ["High", "Medium", "Low"]))
         filt = self.menu.addMenu("News: impact filter")
         a_all = QAction("🌐 Select all (incl. holidays)", self.menu)
@@ -1889,6 +1935,7 @@ class TrayController:
             a.triggered.connect(lambda _=False, c=cur: self.toggle_currency(c))
             curm.addAction(a)
 
+        # -- settings
         theme_m = self.menu.addMenu("Theme")
         tgrp = QActionGroup(self.menu)
         tgrp.setExclusive(True)
@@ -1908,14 +1955,6 @@ class TrayController:
             a.triggered.connect(lambda _=False, v=val: self.set_left_click(v))
             lgrp.addAction(a)
             lcm.addAction(a)
-
-        self.menu.addSeparator()
-        rn = QAction("Refresh news", self.menu)
-        rn.triggered.connect(lambda: self.refresh_news(force=True))
-        self.menu.addAction(rn)
-        pn = QAction("Show / hide panel", self.menu)
-        pn.triggered.connect(self.toggle_panel)
-        self.menu.addAction(pn)
 
         st = QAction("Open on startup (login)", self.menu, checkable=True)
         st.setChecked(is_autostart_enabled())
@@ -2091,12 +2130,15 @@ class TrayController:
                     force_refresh=force,
                     cache_ttl_min=self.settings.get("news_refresh_minutes", 15),
                 )
+                if self._quitting:
+                    return  # app is gone; drop the stale write
                 with self._news_lock:
                     self.events = ev
                     self.news_note = note
             except Exception:
-                with self._news_lock:
-                    self.news_note = "news unavailable (offline?)"
+                if not self._quitting:
+                    with self._news_lock:
+                        self.news_note = "news unavailable (offline?)"
             finally:
                 self._news_busy = False
 
@@ -2339,6 +2381,7 @@ class TrayController:
                     )
 
     def quit_app(self):
+        self._quitting = True  # tell workers to drop late results
         try:
             self.timer.stop()
         except Exception:
@@ -2398,6 +2441,15 @@ class TrayController:
         except Exception:
             pass
         self.panel.show()
+        try:
+            from PyQt6.QtCore import QPropertyAnimation as _QA
+            _anim = _QA(self.panel, b"windowOpacity", self.panel)
+            _anim.setDuration(150)
+            _anim.setStartValue(0.0)
+            _anim.setEndValue(1.0)
+            _anim.start()
+        except Exception:
+            pass
         self.panel.raise_()
         self.panel.activateWindow()
         try:

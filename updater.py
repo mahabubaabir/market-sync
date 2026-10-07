@@ -141,20 +141,21 @@ def download_deb(url: str, dest_path: str) -> bool:
 
 
 def install_deb(deb_path: str) -> bool:
-    """Install the .deb with a GUI password prompt (pkexec), sudo fallback."""
+    """Install the .deb with a GUI password prompt (pkexec only).
+
+    The old `sudo -n` fallback always failed without a NOPASSWD entry
+    and masked the real outcome; a clear pkexec failure lets the caller
+    open the download page instead.
+    """
     if not os.path.exists(deb_path):
         return False
-    for cmd in (["pkexec", "apt-get", "install", "-y", deb_path],
-                ["sudo", "-n", "apt-get", "install", "-y", deb_path]):
-        exe = cmd[0]
-        if not _which(exe):
-            continue
-        try:
-            code = subprocess.call(cmd)
-            return code == 0
-        except Exception:
-            continue
-    return False
+    if not _which("pkexec"):
+        return False
+    try:
+        return subprocess.call(
+            ["pkexec", "apt-get", "install", "-y", deb_path]) == 0
+    except Exception:
+        return False
 
 
 def _which(name: str) -> bool:

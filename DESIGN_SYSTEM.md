@@ -1,7 +1,7 @@
 # Market Sync — Complete Design System & Architecture Specification
 
 **Project**: Market Sync (`market-sync`)  
-**Current Version**: `v1.4.2` (Design Language `v0.2` & `v2.0` Glass Parity)  
+**Current Version**: `v1.5.0` (Design Language `v2.1` Command-Center)  
 **Developer**: **Mahabub H. Aabir** (`maha_bub@outlook.com`)  
 **Official Repository**: [https://github.com/mahabubaabir/market-sync](https://github.com/mahabubaabir/market-sync)  
 **Target Environments**: Linux Mint 21/22+ (Cinnamon 5.x/6.x), Ubuntu 22.04/24.04+ (Cinnamon/GNOME/XFCE)  
@@ -15,8 +15,9 @@
 
 ### Core Visual Principles
 1. **Material UI Frosted Glass (Glassmorphism)**: Translucent, frosted background surfaces (`rgba(...)`) that harmoniously blend with the user’s personal desktop wallpaper.
-2. **Neon Active Highlights**: Open, active trading hubs illuminate with a vivid neon-green glow (`#30d158`), high-contrast badge rings, and border accents.
-3. **Muted Off-State Legibility**: Closed or off-session hubs use crisp, readable silvery-white slate (`#cbd5e1`) instead of overly dark or illegible tones.
+2. **Calm Active Highlights (v2.1)**: Open sessions use one fixed design-system green everywhere — `#30d158` on dark themes, `#16a34a` on light themes — independent of the app theme. Softened theme accents (`#3ecf8e`-family) support it without shouting.
+3. **Muted Off-State Legibility**: Closed or off-session hubs use crisp, readable silvery-white slate instead of overly dark or illegible tones.
+4. **Pills stay pills**: Qt paints opaque QSS backgrounds square, ignoring `border-radius`. Every capsule label therefore sets `WA_TranslucentBackground` (see `pill_label()`), which forces the rounded path without changing colors.
 4. **Minimal Panel Footprint**: Saves over 60% of top bar horizontal space by using 3-letter symbols (`LON`, `NYC`, `SYD`, `TYO`), tight formatting (`+04:05`), and smart session filters (`Active + Next`).
 5. **All-in-One Unified Top Panel Integration**: The Cinnamon applet is a **text-only** widget (`Applet.TextApplet`, no icon actor) showing the **Live Countdown** with **Left-Click to Open Panel** and **Right-Click for App Menu**. The twin-arrow logo lives on the app window, panel brand bar, and standalone tray icon (both-in-one).
 
@@ -159,7 +160,7 @@ The native Cinnamon panel integration resides in `~/.local/share/cinnamon/applet
 ```html
 <span weight="bold" foreground="#30d158">● LON +04:05</span>  <span foreground="#cbd5e1">○ NYC -00:35</span>
 ```
-- **Active Open Market**: Prefixed with filled circle `●`, rendered in **bold neon green** (`#30d158`).
+- **Active Open Market**: Prefixed with filled circle `●`, rendered in the **fixed spec green** — `#30d158` on dark panels, `#16a34a` on light panels (`spec_green()`, independent of the app theme).
 - **Closed Market**: Prefixed with open ring `○`, rendered in **crisp silvery-white slate** (`#cbd5e1`).
 
 ### 6.2 Space-Saving Session Modes
@@ -261,3 +262,21 @@ market-sync --preferences
 # 6. Terminal ASCII trading clock with economic news
 python3 main.py --cli --news
 ```
+
+## 10. Command-Center Layout (v1.5.0)
+
+The dropdown is a 470px command center, top to bottom:
+
+1. **Summary card** — `N MARKETS OPEN` (spec-green count + open symbols) · divider · `NEXT EVENT` (currency + title + countdown, fed by the off-day fallback so it works on weekends).
+2. **SESSION FLOW strip** — five session chips (`● LON` spec-green when open, `○ NYC` silver when closed) + local clock.
+3. **Market cards** — 2-column, 104px, radius 14: 32px landmark badge, name + market-local time, 25px signed countdown, `OPEN`/`CLOSED` pill (`pill_label()`), 28px progress ring (spec-green arc).
+4. **Brand bar** — logo, MARKET SYNC, drawer toggle, alerts bell, preferences, hide.
+5. **Up Next drawer** — 34px rows (relative countdown • impact pill • theme-aware currency pill • title); impact chips and pills share `IMPACT_STYLE` via `impact_variant()`; empty states distinguish weekend-gap / filtered-out / fetching.
+
+### Settings (post-cull)
+
+Twenty keys, every one wired to UI. Removed in v1.5.0: `time_mode`, `min_impact` (migration read kept), `show_symbol`, `show_countdown`, `show_local_time`, `show_next_event` (single-mode tray is fixed `SYM +COUNTDOWN`). Exposed in Preferences: alert timing (5/10/15/30 min) and left-click action.
+
+### Eye-soothing tokens (v2.1)
+
+Deepened backgrounds (`rgba(13,17,25,.92)` dark), softened accents (green `#3ecf8e`-family, cyan `#5bb8dd`), hairline borders (4–6% alpha), warm off-white light surfaces. Contrast floor: body text ≥ 4.5:1, captions/accents ≥ 3:1 on every theme (machine-audited). Panel carries a soft drop shadow; opening fades in over 150ms; `Esc` hides it.
