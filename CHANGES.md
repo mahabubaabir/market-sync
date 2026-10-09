@@ -7,6 +7,11 @@ Tracking file for code changes, install fixes, and how the app works.
 ### v1.5.0 — 2026-10-07 — Command-center redesign + reliability merge
 
 **Hotfix 2026-10-09 (same version, no bump)**
+- Closed/upcoming sessions in the applet now render **off-white**
+  (`#e2e8f0`) on dark panels and dark slate on light ones, decided from the
+  actual Cinnamon panel theme (cached, with an app-theme fallback on
+  non-Cinnamon desktops) — previously they used the app theme token, which
+  was dark and muddy on a dark panel.
 - Cinnamon/Clutter drops the colour attributes of the **first** markup run,
   so the first session rendered in the panel's default colour (white) while
   the rest stayed green. The applet payload now starts with an invisible

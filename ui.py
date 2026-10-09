@@ -262,6 +262,35 @@ def spec_green(theme_name: str) -> str:
     """
     return "#16a34a" if impact_variant(theme_name) == "light" else "#30d158"
 
+
+# Closed/upcoming sessions in the Cinnamon applet: off-white silver on a dark
+# panel, dark slate on a light one. The panel theme is independent of the app
+# theme, so ask Cinnamon directly (cached — this runs inside the 1s tick).
+_APPLET_PANEL_LIGHT = None
+_APPLET_PANEL_CHECKED = 0.0
+
+
+def applet_closed_color(theme_name: str) -> str:
+    """Off-white for closed sessions on dark panels, dark slate on light ones."""
+    global _APPLET_PANEL_LIGHT, _APPLET_PANEL_CHECKED
+    now = datetime.now().timestamp()
+    if _APPLET_PANEL_LIGHT is None or now - _APPLET_PANEL_CHECKED > 60:
+        light = None
+        try:
+            out = subprocess.run(
+                ["gsettings", "get", "org.cinnamon.theme", "name"],
+                capture_output=True, text=True, timeout=1).stdout.strip().lower()
+            if out:
+                light = "dark" not in out
+        except Exception:
+            light = None
+        if light is None:  # non-Cinnamon: fall back to the app theme
+            light = impact_variant(theme_name) == "light"
+        _APPLET_PANEL_LIGHT = light
+        _APPLET_PANEL_CHECKED = now
+    return "#3d4a44" if _APPLET_PANEL_LIGHT else "#e2e8f0"
+
+
 # v2.1 currency accent palette (per-variant: bright on dark, deep on light)
 CURRENCY_COLORS = {
     "USD": {"dark": "#38bdf8", "light": "#0369a1"},
@@ -422,11 +451,10 @@ def _panel_markup(statuses, settings, now_utc) -> tuple[str, str, bool]:
     if not toks:
         toks = [token(s) for s in statuses[:1]]
     plain = "  ".join(f"{sym} {val}" for sym, val, _ in toks)
-    # Fixed spec green for open sessions (independent of the app theme);
-    # closed sessions stay theme-aware silver for panel legibility.
+    # Fixed spec green for open sessions and off-white/slate for closed ones —
+    # both independent of the app theme, keyed to the actual panel theme.
     theme_name = resolve_theme(settings.get("theme", "system"))
-    t = THEMES[theme_name]
-    open_col, closed_col = spec_green(theme_name), t["closed"]
+    open_col, closed_col = spec_green(theme_name), applet_closed_color(theme_name)
     parts = []
     for sym, val, op in toks:
         if op:
