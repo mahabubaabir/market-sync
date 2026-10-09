@@ -1746,6 +1746,7 @@ class TrayController:
         self._update_installing = False
         self._prefs: PreferencesDialog | None = None
         self._news_busy = False
+        self._quitting = False
 
         # NOTE: do not call setVisible() until an icon exists — Qt emits
         # "QSystemTrayIcon::setVisible: No Icon set" and Cinnamon reserves an
@@ -2130,13 +2131,13 @@ class TrayController:
                     force_refresh=force,
                     cache_ttl_min=self.settings.get("news_refresh_minutes", 15),
                 )
-                if self._quitting:
+                if getattr(self, "_quitting", False):
                     return  # app is gone; drop the stale write
                 with self._news_lock:
                     self.events = ev
                     self.news_note = note
             except Exception:
-                if not self._quitting:
+                if not getattr(self, "_quitting", False):
                     with self._news_lock:
                         self.news_note = "news unavailable (offline?)"
             finally:

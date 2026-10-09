@@ -6,6 +6,15 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ### v1.5.0 — 2026-10-07 — Command-center redesign + reliability merge
 
+**Hotfix 2026-10-09 (same version, no bump)**
+- `_quitting` was read and set but never initialized, so every
+  `refresh_news()` worker died with `AttributeError` in its thread (52
+  occurrences in the live log). Consequence since v1.4.6: news never
+  loaded — Up Next, the hero NEXT EVENT and news alerts were all empty.
+  Fixed by initializing the flag in `__init__` and hardening the worker
+  with `getattr`, plus an end-to-end regression check that news actually
+  loads (the old checks only asserted the call returned fast).
+
 **Git reconciliation**
 - Merged `origin/main` (PR #1): DST-safe countdowns, NYSE 2028 exception,
   atomic news-cache writes, strict impact validation, `tests/` + CI.
