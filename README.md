@@ -12,7 +12,7 @@ economic calendar.
 
 ## Install (one command)
 
-Latest release: **v1.5.0** — older `.deb` releases were pruned, so always
+Latest release: **v1.5.1** — older `.deb` releases were pruned, so always
 install the newest asset from the
 [Releases page](https://github.com/mahabubaabir/market-sync/releases).
 

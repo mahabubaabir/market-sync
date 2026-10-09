@@ -224,8 +224,8 @@ THEME_ICON = {
 # v2.0 news-impact capsules (dark + light variants)
 IMPACT_STYLE = {
     "High": {
-        "dark": ("#ef4444", "rgba(239, 68, 68, 0.18)", "rgba(239, 68, 68, 0.40)"),
-        "light": ("#b91c1c", "#fee2e2", "#fca5a5"),
+        "dark": ("#ef4444", "rgba(239, 68, 68, 0.18)", "rgba(239, 68, 68, 0.28)"),
+        "light": ("#b91c1c", "#fee2e2", "#fecaca"),
     },
     "Medium": {
         "dark": ("#f97316", "rgba(249, 115, 22, 0.18)", "rgba(249, 115, 22, 0.40)"),
@@ -759,17 +759,17 @@ if HAS_QT:
             lay.addLayout(top)
 
             bot = QHBoxLayout()
-            bot.setSpacing(6)
+            bot.setSpacing(4)
             self.cd_label = QLabel("+00:00")
-            self.cd_label.setFont(mono_font(25))
+            self.cd_label.setFont(mono_font(22))
             bot.addWidget(self.cd_label)
             bot.addStretch(1)
             self.pill = pill_label("OPEN")
             self.pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.pill.setFixedSize(58, 20)
+            self.pill.setFixedSize(52, 20)
             self.pill.setFont(app_font(9, QFont.Weight.Bold))
             bot.addWidget(self.pill)
-            self.ring = MiniRingTimer(28)
+            self.ring = MiniRingTimer(24)
             bot.addWidget(self.ring)
             lay.addLayout(bot)
 
@@ -848,16 +848,21 @@ if HAS_QT:
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             lay.addWidget(self.rel_label)
 
+            imp_font = app_font(8, QFont.Weight.Bold)
+            try:
+                imp_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 0.4)
+            except Exception:
+                pass
             self.imp_pill = pill_label("LOW")
-            self.imp_pill.setFont(app_font(8, QFont.Weight.Bold))
+            self.imp_pill.setFont(imp_font)
             self.imp_pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.imp_pill.setFixedSize(40, 17)
+            self.imp_pill.setFixedSize(44, 18)
             lay.addWidget(self.imp_pill)
 
             self.cur_pill = pill_label("USD")
             self.cur_pill.setFont(app_font(9, QFont.Weight.Bold))
             self.cur_pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.cur_pill.setFixedSize(40, 17)
+            self.cur_pill.setFixedSize(44, 18)
             lay.addWidget(self.cur_pill)
 
             self.title_label = QLabel("")
@@ -878,14 +883,14 @@ if HAS_QT:
             self.imp_pill.setText(IMPACT_SHORT.get(imp, imp[:3].upper()))
             self.imp_pill.setStyleSheet(
                 f"background: {bg}; color: {fg}; border: 1px solid {border};"
-                "border-radius: 4px; font-weight: bold;")
+                "border-radius: 9px; font-weight: bold;")
 
             cur = (ev.get("currency") or ev.get("country") or "").upper()
             c_fg = currency_color(cur, theme_name, theme["cyan"])
             self.cur_pill.setText(cur[:3])
             self.cur_pill.setStyleSheet(
                 f"background: {theme['input_bg']}; color: {c_fg};"
-                "border: 1px solid " + theme["row_border"] + ";" "border-radius: 4px; font-weight: bold;")
+                "border: 1px solid " + theme["row_border"] + ";" "border-radius: 9px; font-weight: bold;")
 
             self.title_label.setText(ev.get("title", "Event"))
             self.title_label.setStyleSheet(f"color: {theme['text']};")
@@ -1181,8 +1186,12 @@ class SessionPanel(QWidget):
         brand.addWidget(self.title)
         brand.addStretch(1)
 
+        # header actions: one glyph system, one box size. Text glyphs render
+        # in the UI font at 13px; the bell emoji needs 15px to match optically.
+        # (gear is U+2699 *without* VS16 so it renders as a text glyph.)
         self.drawer_btn = QPushButton("▾")
         self.drawer_btn.setProperty("class", "bar")
+        self.drawer_btn.setFixedSize(26, 22)
         self.drawer_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.drawer_btn.setToolTip("Expand / collapse Up Next")
         self.drawer_btn.clicked.connect(self.toggle_drawer)
@@ -1190,13 +1199,16 @@ class SessionPanel(QWidget):
 
         self.bell_btn = QPushButton("🔔")
         self.bell_btn.setProperty("class", "bar")
+        self.bell_btn.setFixedSize(26, 22)
+        self.bell_btn.setStyleSheet("font-size: 15px;")
         self.bell_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.bell_btn.setToolTip("Notifications on / off")
         self.bell_btn.clicked.connect(self.c.toggle_alerts)
         brand.addWidget(self.bell_btn)
 
-        self.gear_btn = QPushButton("⚙️")
+        self.gear_btn = QPushButton("⚙")
         self.gear_btn.setProperty("class", "bar")
+        self.gear_btn.setFixedSize(26, 22)
         self.gear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.gear_btn.setToolTip("Preferences")
         self.gear_btn.clicked.connect(self.c.open_preferences)
@@ -1204,6 +1216,7 @@ class SessionPanel(QWidget):
 
         self.close_btn = QPushButton("✕")
         self.close_btn.setProperty("class", "bar")
+        self.close_btn.setFixedSize(26, 22)
         self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.close_btn.setToolTip("Hide panel (app keeps running)")
         self.close_btn.clicked.connect(self.hide)

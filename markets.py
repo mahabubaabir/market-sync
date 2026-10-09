@@ -246,13 +246,22 @@ def format_countdown(td: timedelta) -> str:
 
 
 def format_signed_countdown(td: timedelta, is_open: bool, include_seconds: bool = False) -> str:
-    """Design System v2.0 style: '+04:05' while open, '-00:35' while closed."""
+    """Signed countdown: '+04:05' while open, '-00:35' while closed.
+
+    Day scale: at/above 100h the hour count is unreadable on cards
+    ('-240:00'), so it collapses to whole days ('-10d') — intraday
+    precision at that range is noise; exact times live in tooltips/drawer.
+    """
     secs = max(0, int(td.total_seconds()))
-    h, rem = divmod(secs, 3600)
-    m, s = divmod(rem, 60)
     sign = "+" if is_open else "-"
     if include_seconds:
+        h, rem = divmod(secs, 3600)
+        m, s = divmod(rem, 60)
         return f"{sign}{h:02d}:{m:02d}:{s:02d}"
+    if secs >= 100 * 3600:
+        return f"{sign}{secs // 86400}d"
+    h, rem = divmod(secs, 3600)
+    m, _s = divmod(rem, 60)
     return f"{sign}{h:02d}:{m:02d}"
 
 

@@ -4,6 +4,20 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.5.1 — 2026-10-09 — Card, pill & header design fixes
+
+- **Congested countdowns**: the 25px countdown label was 4px short of its
+  text (`-61:3'` instead of `-61:37`). Rebudgeted the card row (pill 52px,
+  ring 24px, spacing 4px, countdown 22px mono) so every magnitude fits, and
+  `format_signed_countdown` collapses >=100h to whole days (`-10d`) —
+  intraday precision at that range is noise. Harness asserts no clipping.
+- **HIGH pill looked boxy**: pills are now true pills (44x18, radius 9,
+  letter-spaced 8px text) with a softened High border — same geometry for
+  HIGH/MED/LOW/Holiday on every theme.
+- **Header buttons inconsistent**: text glyphs vs color emoji at one size
+  never align. Gear is now a text glyph (no VS16), all four actions share a
+  26x22 box, the bell emoji is bumped to 15px to match optically.
+
 ### v1.5.0 — 2026-10-07 — Command-center redesign + reliability merge
 
 **Hotfix 2026-10-09 (same version, no bump)**
