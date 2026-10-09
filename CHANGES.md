@@ -7,6 +7,12 @@ Tracking file for code changes, install fixes, and how the app works.
 ### v1.5.0 — 2026-10-07 — Command-center redesign + reliability merge
 
 **Hotfix 2026-10-09 (same version, no bump)**
+- Cinnamon/Clutter drops the colour attributes of the **first** markup run,
+  so the first session rendered in the panel's default colour (white) while
+  the rest stayed green. The applet payload now starts with an invisible
+  zero-width-space run so every open session renders green. Verified with a
+  Pango render: open = #16a34a, closed = slate, and swapping the closed
+  colour changes only the closed run.
 - `_quitting` was read and set but never initialized, so every
   `refresh_news()` worker died with `AttributeError` in its thread (52
   occurrences in the live log). Consequence since v1.4.6: news never

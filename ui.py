@@ -433,7 +433,11 @@ def _panel_markup(statuses, settings, now_utc) -> tuple[str, str, bool]:
             parts.append(f'<span weight="bold" foreground="{open_col}">● {sym} {val}</span>')
         else:
             parts.append(f'<span foreground="{closed_col}">○ {sym} {val}</span>')
-    markup = "  ".join(parts)
+    # Leading zero-width space: several Cinnamon/Clutter versions drop the
+    # colour attributes of the *first* markup run, which rendered the first
+    # session in the panel's default colour (white) while the rest stayed
+    # green. The invisible run absorbs that so every open session is green.
+    markup = "\u200b" + "  ".join(parts)
     any_open = any(s["is_open"] for s in statuses)
     return plain, markup, any_open
 
