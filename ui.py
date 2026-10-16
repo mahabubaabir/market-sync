@@ -25,9 +25,9 @@ try:
     )
     from PyQt6.QtGui import (
         QIcon, QPixmap, QPainter, QColor, QFont, QAction, QActionGroup,
-        QFontMetrics, QPen, QCursor,
+        QFontMetrics, QPen, QCursor, QPainterPath,
     )
-    from PyQt6.QtCore import QTimer, Qt, QRectF, QEvent, pyqtSignal
+    from PyQt6.QtCore import QTimer, Qt, QRectF, QEvent, pyqtSignal, QSize, QPointF
     from PyQt6.QtNetwork import QLocalServer
     HAS_QT = True
 except ImportError:
@@ -66,8 +66,8 @@ THEMES = {
     "dark": {
         "bg": "rgba(13, 17, 25, 0.92)",
         "border": "rgba(255, 255, 255, 0.06)",
-        "card": "rgba(24, 30, 42, 0.72)",
-        "card_active": "rgba(22, 40, 30, 0.66)",
+        "card": "rgba(24, 30, 42, 0.66)",
+        "card_active": "rgba(22, 40, 30, 0.60)",
         "card_border": "rgba(255, 255, 255, 0.05)",
         "card_border_active": "#3ecf8e",
         "card_border_hover": "rgba(255, 255, 255, 0.12)",
@@ -95,8 +95,8 @@ THEMES = {
     "light": {
         "bg": "rgba(250, 249, 246, 0.93)",
         "border": "rgba(30, 25, 20, 0.08)",
-        "card": "rgba(255, 255, 255, 0.88)",
-        "card_active": "rgba(232, 245, 238, 0.92)",
+        "card": "rgba(255, 255, 255, 0.80)",
+        "card_active": "rgba(232, 245, 238, 0.84)",
         "card_border": "rgba(30, 25, 20, 0.06)",
         "card_border_active": "#159a6c",
         "card_border_hover": "rgba(30, 25, 20, 0.12)",
@@ -124,8 +124,8 @@ THEMES = {
     "dark_purple": {
         "bg": "rgba(20, 16, 32, 0.92)",
         "border": "rgba(255, 255, 255, 0.06)",
-        "card": "rgba(33, 27, 48, 0.72)",
-        "card_active": "rgba(26, 42, 32, 0.66)",
+        "card": "rgba(33, 27, 48, 0.64)",
+        "card_active": "rgba(26, 42, 32, 0.58)",
         "card_border": "rgba(255, 255, 255, 0.05)",
         "card_border_active": "#3ed598",
         "card_border_hover": "rgba(255, 255, 255, 0.12)",
@@ -153,8 +153,8 @@ THEMES = {
     "mint_light": {
         "bg": "rgba(246, 250, 246, 0.93)",
         "border": "rgba(16, 43, 35, 0.08)",
-        "card": "rgba(255, 255, 255, 0.88)",
-        "card_active": "rgba(228, 244, 236, 0.92)",
+        "card": "rgba(255, 255, 255, 0.80)",
+        "card_active": "rgba(228, 244, 236, 0.84)",
         "card_border": "rgba(16, 43, 35, 0.06)",
         "card_border_active": "#0e9e6e",
         "card_border_hover": "rgba(16, 43, 35, 0.12)",
@@ -182,8 +182,8 @@ THEMES = {
     "mint_dark": {
         "bg": "rgba(15, 25, 21, 0.92)",
         "border": "rgba(255, 255, 255, 0.06)",
-        "card": "rgba(27, 40, 34, 0.72)",
-        "card_active": "rgba(24, 44, 34, 0.66)",
+        "card": "rgba(27, 40, 34, 0.64)",
+        "card_active": "rgba(24, 44, 34, 0.58)",
         "card_border": "rgba(255, 255, 255, 0.05)",
         "card_border_active": "#3ecf8e",
         "card_border_hover": "rgba(255, 255, 255, 0.12)",
@@ -217,10 +217,6 @@ THEME_LABELS = {
     "system": "System", "light": "Light", "dark": "Dark",
     "dark_purple": "Dark Purple", "mint_light": "Mint Light", "mint_dark": "Mint Dark",
 }
-THEME_ICON = {
-    "system": "🖥️", "light": "☀️", "dark": "🌙",
-    "dark_purple": "🟣", "mint_light": "🌿", "mint_dark": "🍃",
-}
 
 # v2.0 news-impact capsules (dark + light variants)
 IMPACT_STYLE = {
@@ -242,7 +238,6 @@ IMPACT_STYLE = {
     },
 }
 IMPACT_SHORT = {"High": "HIGH", "Medium": "MED", "Low": "LOW", "Holiday": "HOL"}
-PILL_DOT = {"High": "🔴", "Medium": "🟠", "Low": "🟡", "Holiday": "🟣"}
 
 
 def impact_variant(theme_name: str) -> str:
@@ -374,10 +369,36 @@ def mono_font(px: int, weight: QFont.Weight = QFont.Weight.Bold) -> "QFont":
     return f
 
 
+def glass_background(bg: str) -> str:
+    """macOS-style glass sheen: brighter translucent top, deeper bottom.
+
+    Qt has no backdrop blur in QSS, so the glass illusion is a vertical
+    gradient over the translucent panel plus a light top edge (the first
+    stop doubles as the highlight).
+    """
+    c = qcolor(bg)
+    a = c.alphaF()
+    top_a = max(0.0, min(1.0, a - 0.06))
+    bot_a = min(1.0, a + 0.02)
+
+    def mix(target, f):
+        r = int(c.red() + (target[0] - c.red()) * f)
+        g = int(c.green() + (target[1] - c.green()) * f)
+        b = int(c.blue() + (target[2] - c.blue()) * f)
+        return r, g, b
+
+    tr, tg, tb = mix((255, 255, 255), 0.10)
+    br, bg_, bb = mix((0, 0, 0), 0.14)
+    return (f"qlineargradient(x1:0, y1:0, x2:0, y2:1, "
+            f"stop:0 rgba({tr}, {tg}, {tb}, {top_a:.2f}), "
+            f"stop:0.55 {bg}, "
+            f"stop:1 rgba({br}, {bg_}, {bb}, {bot_a:.2f}))")
+
+
 def stylesheet(t: dict) -> str:
     return f"""
 QFrame#PanelRoot {{
-    background: {t['bg']};
+    background: {glass_background(t['bg'])};
     border: 1px solid {t['border']};
     border-radius: 14px;
 }}
@@ -571,6 +592,39 @@ def make_tray_logo_icon(any_open: bool, size: int = 24) -> "QIcon":
     p.drawEllipse(size - 9, size - 9, 7, 7)
     p.end()
     return QIcon(pm)
+
+
+def bell_pixmap(size: int, color: str, off: bool = False) -> "QPixmap":
+    """Bell icon drawn in code — emoji fonts render as tofu boxes on some
+    systems, which is exactly the inconsistency this replaces."""
+    dpr = 2.0
+    pm = QPixmap(int(size * dpr), int(size * dpr))
+    pm.setDevicePixelRatio(dpr)
+    pm.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    s_ = float(size)
+    pen = QPen(QColor(color), max(1.3, s_ * 0.085))
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+    p.setPen(pen)
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    path = QPainterPath()
+    path.moveTo(s_ * 0.22, s_ * 0.68)
+    path.cubicTo(s_ * 0.32, s_ * 0.62, s_ * 0.33, s_ * 0.52, s_ * 0.33, s_ * 0.44)
+    path.cubicTo(s_ * 0.33, s_ * 0.26, s_ * 0.40, s_ * 0.20, s_ * 0.50, s_ * 0.20)
+    path.cubicTo(s_ * 0.60, s_ * 0.20, s_ * 0.67, s_ * 0.26, s_ * 0.67, s_ * 0.44)
+    path.cubicTo(s_ * 0.67, s_ * 0.52, s_ * 0.68, s_ * 0.62, s_ * 0.78, s_ * 0.68)
+    path.closeSubpath()
+    p.drawPath(path)
+    p.setBrush(QColor(color))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.drawEllipse(QRectF(s_ * 0.42, s_ * 0.73, s_ * 0.16, s_ * 0.16))
+    if off:
+        p.setPen(QPen(QColor(color), max(1.4, s_ * 0.10)))
+        p.drawLine(QPointF(s_ * 0.26, s_ * 0.24), QPointF(s_ * 0.76, s_ * 0.80))
+    p.end()
+    return pm
 
 
 def pill_label(text: str = "") -> "QLabel":
@@ -950,7 +1004,7 @@ if HAS_QT:
             self.chip_all.setCursor(Qt.CursorShape.PointingHandCursor)
             self.chip_all.clicked.connect(self._on_all)
             hl.addWidget(self.chip_all)
-            for lvl, label in (("High", "🔴 High"), ("Medium", "🟠 Med"), ("Low", "🟡 Low")):
+            for lvl, label in (("High", "High"), ("Medium", "Med"), ("Low", "Low")):
                 b = QPushButton(label)
                 b.setCheckable(True)
                 b.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1217,10 +1271,10 @@ class SessionPanel(QWidget):
         self.drawer_btn.clicked.connect(self.toggle_drawer)
         brand.addWidget(self.drawer_btn)
 
-        self.bell_btn = QPushButton("🔔")
+        self.bell_btn = QPushButton("")
         self.bell_btn.setProperty("class", "bar")
         self.bell_btn.setFixedSize(26, 22)
-        self.bell_btn.setStyleSheet("font-size: 15px;")
+        self.bell_btn.setIconSize(QSize(15, 15))
         self.bell_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.bell_btn.setToolTip("Notifications on / off")
         self.bell_btn.clicked.connect(self.c.toggle_alerts)
@@ -1326,22 +1380,27 @@ class SessionPanel(QWidget):
         # pills use — so chips and pills always match (a hard-coded bright
         # like #eab308 is unreadable on light themes, cr 1.6).
         variant = impact_variant(self._theme)
-        for lvl, b in self.drawer.chips.items():
-            base = IMPACT_STYLE[lvl][variant][0]
+
+        def chip_style(base: str) -> str:
+            """One geometry for every chip; only the colour differs when active.
+
+            Unchecked and checked share padding, radius and a hairline edge,
+            so the row can never read as mixed box/rounded shapes again.
+            """
             c = QColor(base)
-            tint = f"rgba({c.red()}, {c.green()}, {c.blue()}, 46)"
-            b.setStyleSheet(
+            tint = f"rgba({c.red()}, {c.green()}, {c.blue()}, 40)"
+            edge = f"rgba({c.red()}, {c.green()}, {c.blue()}, 150)"
+            return (
                 f"QPushButton {{ background: {t['input_bg']}; color: {t['secondary']};"
-                f" border: 1px solid {t['input_border']}; border-radius: 10px;"
-                " padding: 2px 8px; font-size: 10px; font-weight: 700; }"
-                f"QPushButton:checked {{ color: {base}; border-color: {base}; background: {tint}; }}")
-        c = QColor(t["cyan"])
-        tint = f"rgba({c.red()}, {c.green()}, {c.blue()}, 46)"
-        self.drawer.chip_all.setStyleSheet(
-            f"QPushButton {{ background: {t['input_bg']}; color: {t['secondary']};"
-            f" border: 1px solid {t['input_border']}; border-radius: 10px;"
-            " padding: 2px 10px; font-size: 10px; font-weight: 700; }"
-            f"QPushButton:checked {{ color: {t['cyan']}; border-color: {t['cyan']}; background: {tint}; }}")
+                f" border: 1px solid transparent; border-radius: 10px;"
+                " padding: 2px 10px; font-size: 10px; font-weight: 700; }"
+                f"QPushButton:hover {{ color: {t['text']}; }}"
+                f"QPushButton:checked {{ color: {base}; border-color: {edge};"
+                f" background: {tint}; }}")
+
+        for lvl, b in self.drawer.chips.items():
+            b.setStyleSheet(chip_style(IMPACT_STYLE[lvl][variant][0]))
+        self.drawer.chip_all.setStyleSheet(chip_style(t["cyan"]))
 
     def render(self, statuses, selected, news, news_note, now_utc):
         if resolve_theme(self.c.settings.get("theme", "system")) != self._theme:
@@ -1376,7 +1435,12 @@ class SessionPanel(QWidget):
                 self.cards[mid].update_data(s, t, mid == sel_id, is_12h,
                                             brighten, self._theme)
 
-        self.bell_btn.setText("🔔" if self.c.settings.get("alerts_enabled", True) else "🔕")
+        bell_off = not self.c.settings.get("alerts_enabled", True)
+        if (bell_off, self._theme) != getattr(self, "_bell_state", None):
+            self._bell_state = (bell_off, self._theme)
+            self.bell_btn.setIcon(QIcon(bell_pixmap(16, t["secondary"], bell_off)))
+            self.bell_btn.setToolTip(
+                "Notifications off" if bell_off else "Notifications on")
 
         active = list(self.c.settings.get("active_impacts", ["High", "Medium", "Low"]))
         self.drawer.sync_chips(active)
@@ -1522,7 +1586,7 @@ if HAS_QT:
             active = set(s.get("active_impacts", ["High", "Medium", "Low"]))
             improw = QHBoxLayout()
             self.imp_chks: dict = {}
-            for lvl, label in (("High", "🔴 High"), ("Medium", "🟠 Med"), ("Low", "🟡 Low")):
+            for lvl, label in (("High", "High"), ("Medium", "Med"), ("Low", "Low")):
                 chk = QCheckBox(label)
                 chk.setChecked(lvl in active)
                 self.imp_chks[lvl] = chk
@@ -1561,12 +1625,12 @@ if HAS_QT:
             section("Window & Startup")
             self.theme_cb = QComboBox()
             for key in THEME_ORDER:
-                self.theme_cb.addItem(f"{THEME_ICON[key]}  {THEME_LABELS[key]}", key)
+                self.theme_cb.addItem(THEME_LABELS[key], key)
             self.theme_cb.setCurrentIndex(THEME_ORDER.index(s.get("theme", "system")))
             row("Theme", self.theme_cb)
             self.sel_cb = QComboBox()
             for m in MARKETS:
-                self.sel_cb.addItem(f"{m['flag']}  {m['name']}", m["id"])
+                self.sel_cb.addItem(m["name"], m["id"])
             self.sel_cb.setCurrentIndex(MARKET_IDS.index(s.get("selected_market", "LONDON")))
             row("Default market", self.sel_cb)
             self.seg_leftclick = self._seg(
@@ -2008,11 +2072,11 @@ class TrayController:
         # -- filters
         active = set(self.settings.get("active_impacts", ["High", "Medium", "Low"]))
         filt = self.menu.addMenu("News: impact filter")
-        a_all = QAction("🌐 Select all (incl. holidays)", self.menu)
+        a_all = QAction("Select all (incl. holidays)", self.menu)
         a_all.triggered.connect(lambda: self.set_active_impacts(["High", "Medium", "Low"]))
         filt.addAction(a_all)
         filt.addSeparator()
-        for lvl, label in (("High", "🔴 High"), ("Medium", "🟠 Medium"), ("Low", "🟡 Low")):
+        for lvl, label in (("High", "High"), ("Medium", "Medium"), ("Low", "Low")):
             a = QAction(label, self.menu, checkable=True)
             a.setChecked(lvl in active)
             a.triggered.connect(lambda _=False, lv=lvl: self.toggle_impact(lv))
@@ -2030,7 +2094,7 @@ class TrayController:
         tgrp = QActionGroup(self.menu)
         tgrp.setExclusive(True)
         for t in THEME_ORDER:
-            a = QAction(f"{THEME_ICON[t]}  {THEME_LABELS[t]}", self.menu, checkable=True)
+            a = QAction(THEME_LABELS[t], self.menu, checkable=True)
             a.setChecked(self.settings.get("theme", "system") == t)
             a.triggered.connect(lambda _=False, tv=t: self.set_theme(tv))
             tgrp.addAction(a)

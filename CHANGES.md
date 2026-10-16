@@ -4,6 +4,22 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.5.3 — 2026-10-16 — No more tofu boxes; glass inside the app; logo restored
+
+- **Emoji boxes removed everywhere**: theme names (Preferences + tray menu),
+  news filter chips, impact checkboxes and the tray filter menu are plain
+  text now; `PILL_DOT` deleted; flag emoji dropped from the market combo.
+- **Bell is drawn in code** (on/off variants, theme-coloured) — the last
+  emoji in the chrome, which rendered as a tofu box on this system.
+- **One chip geometry**: all filter chips share padding, radius and a
+  hairline edge; checked differs only by impact colour + tint, so the row
+  can never read as mixed box/rounded shapes.
+- **Glass INSIDE the app**: `PanelRoot` uses a vertical glass gradient
+  (bright translucent top, deeper bottom) and summary/market cards are more
+  translucent, so the backdrop reads through the whole stack.
+- **Logo restored** to the previous flat twin-arrow mark (the v1.5.2 glass
+  tile was a misread of the request) — app, brand and applet art.
+
 ### v1.5.2 — 2026-10-16 — Glass tile icon + five reliability fixes
 
 - **Frosted-glass app icon**: the twin-arrow mark now sits in a translucent

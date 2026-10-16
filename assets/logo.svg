@@ -1,41 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
-  <!-- Market Sync brand mark — frosted-glass tile + twin arrows + the
-       illuminated convergence core (brand/docs use at large sizes). -->
+  <!-- Market Sync brand mark — twin synchronizing arrows converging on an
+       illuminated core. Same bold geometry as assets/icon.svg (28-unit bands,
+       blunt heads, 42-degree gaps) with the sync-point glow added back for
+       large-size/brand usage (docs, README, release notes). -->
   <defs>
-    <linearGradient id="glassBody" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.30"/>
-      <stop offset="45%" stop-color="#ffffff" stop-opacity="0.08"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.16"/>
-    </linearGradient>
-    <linearGradient id="arrowA" gradientUnits="userSpaceOnUse" x1="26" y1="78" x2="58" y2="26">
+    <linearGradient id="arrowA" gradientUnits="userSpaceOnUse" x1="18" y1="82" x2="62" y2="18">
       <stop offset="0%" stop-color="#22d3ee"/>
       <stop offset="100%" stop-color="#6366f1"/>
     </linearGradient>
-    <linearGradient id="arrowB" gradientUnits="userSpaceOnUse" x1="74" y1="22" x2="42" y2="74">
+    <linearGradient id="arrowB" gradientUnits="userSpaceOnUse" x1="82" y1="18" x2="38" y2="82">
       <stop offset="0%" stop-color="#34d399"/>
       <stop offset="100%" stop-color="#0ea5e9"/>
     </linearGradient>
-    <filter id="tileShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="2.5"/>
-    </filter>
     <filter id="coreGlow" x="-120%" y="-120%" width="340%" height="340%">
-      <feGaussianBlur stdDeviation="3"/>
+      <feGaussianBlur stdDeviation="4"/>
     </filter>
   </defs>
 
-  <rect x="7" y="8" width="86" height="86" rx="24" fill="#000000" fill-opacity="0.35" filter="url(#tileShadow)"/>
-  <rect x="6" y="6" width="88" height="88" rx="24" fill="#141c2b" fill-opacity="0.62"/>
-  <rect x="6" y="6" width="88" height="88" rx="24" fill="url(#glassBody)"
-        stroke="#ffffff" stroke-opacity="0.32" stroke-width="1.5"/>
-  <path d="M 14 30 Q 14 12 32 12 L 68 12 Q 86 12 86 30 Q 86 22 70 22 L 30 22 Q 14 22 14 30 Z"
-        fill="#ffffff" fill-opacity="0.14"/>
-
-  <path d="M 32.75 16.14 A 38 38 0 0 0 25.07 78.68 L 37.64 82.21 L 41.22 72.87 L 36.22 65.85 A 21 21 0 0 1 44.56 29.72 Z"
+  <!-- Upper arrow: cyan -> indigo -->
+  <path d="M 28.66 8.12 A 47 47 0 0 0 19.17 85.47 L 36.02 86.41 L 40.32 75.21 L 37.53 64.34 A 19 19 0 0 1 45.08 31.65 Z"
         fill="url(#arrowA)"/>
-  <path d="M 67.25 83.86 A 38 38 0 0 0 74.93 21.32 L 62.36 17.79 L 58.78 27.13 L 63.78 34.15 A 21 21 0 0 1 55.44 70.28 Z"
+
+  <!-- Lower arrow (180 degrees opposite): emerald -> sky -->
+  <path d="M 71.34 91.88 A 47 47 0 0 0 80.83 14.53 L 63.98 13.59 L 59.68 24.79 L 62.47 35.66 A 19 19 0 0 1 54.92 68.35 Z"
         fill="url(#arrowB)"/>
 
-  <circle cx="50" cy="50" r="5.5" fill="#ffffff" opacity="0.9" filter="url(#coreGlow)"/>
-  <circle cx="50" cy="50" r="5.5" fill="#ffffff"/>
-  <circle cx="50" cy="50" r="3" fill="#38bdf8"/>
+  <!-- Illuminated convergence core -->
+  <circle cx="50" cy="50" r="6.5" fill="#ffffff" opacity="0.9" filter="url(#coreGlow)"/>
+  <circle cx="50" cy="50" r="6.5" fill="#ffffff"/>
+  <circle cx="50" cy="50" r="3.5" fill="#38bdf8"/>
 </svg>
