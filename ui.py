@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 import os
 import subprocess
 import threading
+import time
 
 try:
     from PyQt6.QtWidgets import (
@@ -266,29 +267,28 @@ def spec_green(theme_name: str) -> str:
 # Closed/upcoming sessions in the Cinnamon applet: off-white silver on a dark
 # panel, dark slate on a light one. The panel theme is independent of the app
 # theme, so ask Cinnamon directly (cached — this runs inside the 1s tick).
-_APPLET_PANEL_LIGHT = None
-_APPLET_PANEL_CHECKED = 0.0
+def detect_light_panel() -> bool | None:
+    """Ask Cinnamon whether the panel theme is light (None = unknown).
+
+    Forks gsettings, which can block for its full timeout — call from a
+    worker thread only, never from the 1s GUI tick.
+    """
+    try:
+        out = subprocess.run(
+            ["gsettings", "get", "org.cinnamon.theme", "name"],
+            capture_output=True, text=True, timeout=1).stdout.strip().lower()
+        if out:
+            return "dark" not in out
+    except Exception:
+        pass
+    return None
 
 
-def applet_closed_color(theme_name: str) -> str:
+def applet_closed_color(theme_name: str, panel_light=None) -> str:
     """Off-white for closed sessions on dark panels, dark slate on light ones."""
-    global _APPLET_PANEL_LIGHT, _APPLET_PANEL_CHECKED
-    now = datetime.now().timestamp()
-    if _APPLET_PANEL_LIGHT is None or now - _APPLET_PANEL_CHECKED > 60:
-        light = None
-        try:
-            out = subprocess.run(
-                ["gsettings", "get", "org.cinnamon.theme", "name"],
-                capture_output=True, text=True, timeout=1).stdout.strip().lower()
-            if out:
-                light = "dark" not in out
-        except Exception:
-            light = None
-        if light is None:  # non-Cinnamon: fall back to the app theme
-            light = impact_variant(theme_name) == "light"
-        _APPLET_PANEL_LIGHT = light
-        _APPLET_PANEL_CHECKED = now
-    return "#3d4a44" if _APPLET_PANEL_LIGHT else "#e2e8f0"
+    if panel_light is None:  # no reading available: approximate by app theme
+        panel_light = impact_variant(theme_name) == "light"
+    return "#3d4a44" if panel_light else "#e2e8f0"
 
 
 # v2.1 currency accent palette (per-variant: bright on dark, deep on light)
@@ -412,7 +412,7 @@ QComboBox QAbstractItemView {{ background: {t['solid_bg']}; color: {t['text']}; 
 
 # ---------------------------------------------------------------- tray helpers
 
-def _panel_markup(statuses, settings, now_utc) -> tuple[str, str, bool]:
+def _panel_markup(statuses, settings, now_utc, panel_light=None) -> tuple[str, str, bool]:
     """Build the applet payload: (plain_label, pango_markup, any_open).
 
     Follows the spec: bright bold green ● for open sessions, silvery ○ for
@@ -454,7 +454,7 @@ def _panel_markup(statuses, settings, now_utc) -> tuple[str, str, bool]:
     # Fixed spec green for open sessions and off-white/slate for closed ones —
     # both independent of the app theme, keyed to the actual panel theme.
     theme_name = resolve_theme(settings.get("theme", "system"))
-    open_col, closed_col = spec_green(theme_name), applet_closed_color(theme_name)
+    open_col, closed_col = spec_green(theme_name), applet_closed_color(theme_name, panel_light)
     parts = []
     for sym, val, op in toks:
         if op:
@@ -470,9 +470,9 @@ def _panel_markup(statuses, settings, now_utc) -> tuple[str, str, bool]:
     return plain, markup, any_open
 
 
-def _write_panel_status(statuses, settings, now_utc, last: dict) -> dict:
+def _write_panel_status(statuses, settings, now_utc, last: dict, panel_light=None) -> dict:
     """Write ~/.cache/market-sync/panel_status.json for the Cinnamon applet."""
-    plain, markup, any_open = _panel_markup(statuses, settings, now_utc)
+    plain, markup, any_open = _panel_markup(statuses, settings, now_utc, panel_light)
     is_12h = settings.get("time_format", "24h") == "12h"
     lines = []
     for s in statuses:
@@ -603,21 +603,36 @@ def _empty_text_for(note: str | None, mode: str) -> str:
     return _empty_text(note)
 
 
+_HOLIDAY_CACHE_KEY = None
+_HOLIDAY_CACHE_VAL = ""
+
+
 def _next_nyse_holiday_line(now_utc=None) -> str:
+    """Next NYSE full holiday, cached per calendar day (runs in the 1s tick)."""
+    global _HOLIDAY_CACHE_KEY, _HOLIDAY_CACHE_VAL
     from datetime import timedelta
     from zoneinfo import ZoneInfo
     from markets import nyse_holidays
     now_utc = now_utc or datetime.now(timezone.utc)
+    key = (now_utc.year, now_utc.timetuple().tm_yday)
+    if key == _HOLIDAY_CACHE_KEY:
+        return _HOLIDAY_CACHE_VAL
+    result = ""
     try:
         ny = ZoneInfo("America/New_York")
         base = now_utc.astimezone(ny)
         for i in range(0, 370):
             cand = base + timedelta(days=i)
             if cand.weekday() < 5 and cand.date() in nyse_holidays(cand.year):
-                return f"NYSE holiday: {cand.strftime('%a %b %d')} — closed"
-        return "NYSE: no upcoming holiday this year"
+                result = f"NYSE holiday: {cand.strftime('%a %b %d')} — closed"
+                break
+        else:
+            result = "NYSE: no upcoming holiday this year"
     except Exception:
-        return ""
+        result = ""
+    _HOLIDAY_CACHE_KEY = key
+    _HOLIDAY_CACHE_VAL = result
+    return result
 
 
 def _svg_path(landmark: str) -> str:
@@ -892,7 +907,12 @@ if HAS_QT:
                 f"background: {theme['input_bg']}; color: {c_fg};"
                 "border: 1px solid " + theme["row_border"] + ";" "border-radius: 9px; font-weight: bold;")
 
-            self.title_label.setText(ev.get("title", "Event"))
+            title = ev.get("title", "Event")
+            fm = QFontMetrics(self.title_label.font())
+            avail = max(60, self.title_label.width())
+            self.title_label.setText(
+                fm.elidedText(title, Qt.TextElideMode.ElideRight, avail))
+            self.title_label.setToolTip(title)
             self.title_label.setStyleSheet(f"color: {theme['text']};")
 else:
     class NewsRowWidget:  # type: ignore
@@ -1755,6 +1775,7 @@ if HAS_QT:
             if self.autostart_chk.isChecked() != is_autostart_enabled():
                 self.c.set_autostart_enabled(self.autostart_chk.isChecked())
             self.c._save()
+            self.c._sync_news_timer()
             self.c._build_menu()
             self.c.panel.apply_theme()
             self.c.panel.rebuild_grid()
@@ -1792,6 +1813,7 @@ class TrayController:
         self._prefs: PreferencesDialog | None = None
         self._news_busy = False
         self._quitting = False
+        self._panel_light_lock = threading.Lock()
 
         # NOTE: do not call setVisible() until an icon exists — Qt emits
         # "QSystemTrayIcon::setVisible: No Icon set" and Cinnamon reserves an
@@ -1838,6 +1860,12 @@ class TrayController:
         self.applet_timer = QTimer()
         self.applet_timer.timeout.connect(self._refresh_tray_visibility)
         self.applet_timer.start(15000)
+        # One synchronous read at startup, then refresh off-thread only:
+        # gsettings forks can stall for their full timeout and must never
+        # hitch the 1s tick (or the 15s timer).
+        self._applet_active = self._detect_applet()
+        self._panel_light = detect_light_panel()
+        self._start_panel_watch()
         QTimer.singleShot(1500, self._refresh_tray_visibility)
 
         self.refresh_news(force=True)
@@ -1910,8 +1938,24 @@ class TrayController:
         except Exception:
             return False
 
+    def _start_panel_watch(self):
+        """Refresh Cinnamon panel facts from a worker thread (10-min cycle)."""
+
+        def watch():
+            while not self._quitting:
+                try:
+                    self._applet_active = self._detect_applet()
+                    light = detect_light_panel()
+                    if light is not None:
+                        with self._panel_light_lock:
+                            self._panel_light = light
+                except Exception:
+                    pass
+                time.sleep(600)
+
+        threading.Thread(target=watch, daemon=True).start()
+
     def _refresh_tray_visibility(self):
-        self._applet_active = self._detect_applet()
         show = True
         if self._applet_active and not self.settings.get("show_standalone_tray", True):
             show = False  # user opted into applet-only
@@ -2019,6 +2063,14 @@ class TrayController:
     def _save(self):
         from config import save_settings
         save_settings(self.settings)
+
+    def _sync_news_timer(self):
+        """Apply the saved news-refresh interval without needing a restart."""
+        try:
+            self.news_timer.start(
+                max(5, self.settings.get("news_refresh_minutes", 15)) * 60 * 1000)
+        except Exception:
+            pass
 
     # -- settings mutators
     def select_market(self, mid: str):
@@ -2335,7 +2387,8 @@ class TrayController:
         # -- Cinnamon applet status file
         try:
             self._status_payload = _write_panel_status(
-                self.statuses, self.settings, now_utc, self._status_payload)
+                self.statuses, self.settings, now_utc, self._status_payload,
+                getattr(self, "_panel_light", None))
         except Exception:
             pass
 

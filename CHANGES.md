@@ -4,6 +4,23 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.5.2 — 2026-10-16 — Glass tile icon + five reliability fixes
+
+- **Frosted-glass app icon**: the twin-arrow mark now sits in a translucent
+  glass squircle (sheen, hairline light edge, soft shadow) — `assets/icon.svg`
+  and `logo.svg`, mirrored into the Cinnamon applet art and hicolor PNGs.
+- **No more GUI-thread forks**: the panel-theme and applet-detection
+  `gsettings` reads moved out of the 1s tick and 15s timer — one synchronous
+  read at startup, then a 10-minute worker-thread refresh. A stalled D-Bus
+  can no longer freeze the UI for seconds.
+- **Day-scale consistency**: `format_signed_countdown(include_seconds=True)`
+  now collapses >=100h to `-Xd` like the cards (was `+240:00:00`).
+- **News refresh interval applies immediately** after Preferences saves
+  (`_sync_news_timer`), instead of only after a restart.
+- **Long event titles elide** with an ellipsis and carry a full-title
+  tooltip instead of hard-clipping.
+- **NYSE holiday scan cached per day** (was recomputed every 1s tick).
+
 ### v1.5.1 — 2026-10-09 — Card, pill & header design fixes
 
 - **Congested countdowns**: the 25px countdown label was 4px short of its
