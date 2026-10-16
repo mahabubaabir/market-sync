@@ -8,6 +8,7 @@ Tray app (PyQt6) with CLI fallback:
 """
 from __future__ import annotations
 import argparse
+import os
 import sys
 import time
 import signal
@@ -88,19 +89,16 @@ def _single_instance_or_exit() -> None:
     retries = 8 if os.environ.get("MARKET_SYNC_RELAUNCH") == "1" else 1
     try:
         os.makedirs(os.path.dirname(LOCK_PATH), exist_ok=True)
-        import fcntl
-        fh = open(LOCK_PATH, "w")
+        # QLockFile is cross-platform (Windows included) and detects stale
+        # locks from crashed processes; fcntl was Unix-only.
+        from PyQt6.QtCore import QLockFile
+        lock = QLockFile(LOCK_PATH)
+        lock.setStaleLockTime(30_000)
         for _ in range(retries):
-            try:
-                fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except OSError:
-                time.sleep(0.5)
-                continue
-            # keep handle open for process lifetime
-            globals()["_lock_fh"] = fh
-            fh.write(str(os.getpid()))
-            fh.flush()
-            return
+            if lock.tryLock(200):
+                globals()["_lock"] = lock  # keep for process lifetime
+                return
+            time.sleep(0.5)
         print("Market Sync is already running (tray icon active).", file=sys.stderr)
         sys.exit(0)
     except SystemExit:
@@ -109,7 +107,39 @@ def _single_instance_or_exit() -> None:
         pass
 
 
+def _setup_logging() -> None:
+    """Windowed exes have no console — keep a rotating log for diagnostics.
+
+    Also routes uncaught worker-thread exceptions into the log (that class
+    of error once hid a dead news pipeline for days).
+    """
+    try:
+        import logging
+        import threading
+        from config import LOG_PATH
+        os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+        if os.path.exists(LOG_PATH) and os.path.getsize(LOG_PATH) > 1_048_576:
+            try:
+                os.replace(LOG_PATH, LOG_PATH + ".1")
+            except Exception:
+                pass
+        logging.basicConfig(
+            filename=LOG_PATH, level=logging.INFO,
+            format="%(asctime)s %(levelname)s %(message)s")
+
+        def _thread_hook(argexc):
+            logging.error("uncaught exception in %s",
+                          getattr(argexc.thread, "name", "?"),
+                          exc_info=(argexc.exc_type, argexc.exc_value,
+                                    argexc.exc_traceback))
+
+        threading.excepthook = _thread_hook
+    except Exception:
+        pass
+
+
 def run_gui(args) -> int:
+    _setup_logging()
     try:
         from PyQt6.QtWidgets import QApplication
         from ui import TrayController, HAS_QT
@@ -150,7 +180,11 @@ def run_gui(args) -> int:
         ctl.quit_app()
 
     signal.signal(signal.SIGINT, handle_signal)
-    signal.signal(signal.SIGTERM, handle_signal)
+    if hasattr(signal, "SIGTERM"):
+        try:
+            signal.signal(signal.SIGTERM, handle_signal)
+        except Exception:
+            pass  # not deliverable on Windows
 
     # Normal launch -> show panel once.
     # --hidden (autostart/background) or saved start_hidden -> tray only.

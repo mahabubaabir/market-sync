@@ -13,7 +13,9 @@ Implements the Market Sync Design System v2.0 (System_Design/DESIGN_SYSTEM.md):
 from __future__ import annotations
 from datetime import datetime, timezone
 import os
+import shutil
 import subprocess
+import sys
 import threading
 import time
 
@@ -46,6 +48,7 @@ from config import (
     USER_AUTOSTART_PATH, autostart_exec_line, app_dir, IS_PACKAGED,
     LAUNCHER_PATH, APP_NAME, APP_VERSION, APP_AUTHOR, CACHE_DIR,
     UPDATE_CHECK_HOURS, IPC_SOCKET_NAME, APPLET_UUID, PANEL_STATUS_PATH,
+    IS_WINDOWS, set_windows_autostart,
 )
 import markets as engine
 import calendar_api
@@ -268,6 +271,8 @@ def detect_light_panel() -> bool | None:
     Forks gsettings, which can block for its full timeout — call from a
     worker thread only, never from the 1s GUI tick.
     """
+    if not shutil.which("gsettings"):
+        return None  # Windows / non-GNOME: caller falls back to the app theme
     try:
         out = subprocess.run(
             ["gsettings", "get", "org.cinnamon.theme", "name"],
@@ -350,7 +355,7 @@ def app_font(px: int, weight: QFont.Weight = QFont.Weight.Normal) -> "QFont":
     """Design-system font stack: Inter -> Noto Sans -> Ubuntu -> Sans."""
     f = QFont("Inter")
     try:
-        f.setFamilies(["Inter", "Noto Sans", "Ubuntu", "DejaVu Sans", "Sans"])
+        f.setFamilies(["Inter", "Segoe UI", "Noto Sans", "Ubuntu", "DejaVu Sans", "Sans"])
     except Exception:
         pass
     f.setPixelSize(px)
@@ -361,7 +366,8 @@ def app_font(px: int, weight: QFont.Weight = QFont.Weight.Normal) -> "QFont":
 def mono_font(px: int, weight: QFont.Weight = QFont.Weight.Bold) -> "QFont":
     f = QFont("JetBrains Mono")
     try:
-        f.setFamilies(["JetBrains Mono", "Fira Code", "DejaVu Sans Mono", "monospace"])
+        f.setFamilies(["JetBrains Mono", "Cascadia Mono", "Consolas", "Fira Code",
+                       "DejaVu Sans Mono", "monospace"])
     except Exception:
         pass
     f.setPixelSize(px)
@@ -1992,6 +1998,8 @@ class TrayController:
 
     # ---------------- applet / tray coordination
     def _detect_applet(self) -> bool:
+        if not shutil.which("gsettings"):
+            return False  # no Cinnamon applet outside Linux
         try:
             import ast
             res = subprocess.run(
@@ -2237,6 +2245,12 @@ class TrayController:
             self._prefs = None
 
     def set_autostart_enabled(self, on: bool):
+        if IS_WINDOWS:
+            set_windows_autostart(bool(on))
+            self._build_menu()
+            if self.panel.isVisible():
+                self.tick()
+            return
         from config import SYSTEM_AUTOSTART_PATH
         try:
             os.makedirs(os.path.dirname(USER_AUTOSTART_PATH), exist_ok=True)
@@ -2368,13 +2382,16 @@ class TrayController:
         notify(APP_NAME, f"Downloading v{ui.get('version')}…")
 
         def _work():
-            dest = os.path.join(CACHE_DIR, "update.deb")
+            dest = os.path.join(CACHE_DIR, "update.exe" if IS_WINDOWS else "update.deb")
             try:
                 if not updater.download_deb(url, dest):
                     self._update_status = ("error", ui)
                     return
                 self._update_status = ("installing", ui)
-                ok = updater.install_deb(dest)
+                if IS_WINDOWS:
+                    ok = updater.install_windows(dest)
+                else:
+                    ok = updater.install_deb(dest)
                 self._update_status = ("installed", ui) if ok else ("error", ui)
             finally:
                 self._update_installing = False
@@ -2383,16 +2400,31 @@ class TrayController:
 
     def _relaunch(self):
         try:
-            if IS_PACKAGED and os.path.exists(LAUNCHER_PATH):
-                cmd = f"sleep 2; MARKET_SYNC_RELAUNCH=1 exec {LAUNCHER_PATH}"
+            if IS_WINDOWS:
+                if getattr(sys, "frozen", False):
+                    argv = [sys.executable, "--hidden"]
+                else:
+                    argv = [sys.executable,
+                            os.path.join(app_dir(), "main.py"), "--hidden"]
+                subprocess.Popen(
+                    argv, env=dict(os.environ, MARKET_SYNC_RELAUNCH="1"),
+                    close_fds=True, creationflags=0x08000000,  # CREATE_NO_WINDOW
+                )
+            elif IS_PACKAGED and os.path.exists(LAUNCHER_PATH):
+                subprocess.Popen(
+                    ["setsid", "bash", "-c",
+                     f"sleep 2; MARKET_SYNC_RELAUNCH=1 exec {LAUNCHER_PATH}"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
             else:
-                cmd = (f"sleep 2; MARKET_SYNC_RELAUNCH=1 exec /usr/bin/python3 "
-                       f"{os.path.join(app_dir(), 'main.py')}")
-            subprocess.Popen(
-                ["setsid", "bash", "-c", cmd],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
+                subprocess.Popen(
+                    ["setsid", "bash", "-c",
+                     f"sleep 2; MARKET_SYNC_RELAUNCH=1 exec /usr/bin/python3 "
+                     f"{os.path.join(app_dir(), 'main.py')}"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
         except Exception:
             pass
         self.quit_app()

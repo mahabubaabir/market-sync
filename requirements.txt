@@ -8,3 +8,8 @@ PyQt6-Qt6>=6.6
 requests>=2.31
 # optional desktop notifications (falls back to notify-send automatically):
 plyer>=2.1
+
+# Windows: the IANA timezone database (Linux/macOS have it in the OS)
+tzdata>=2024.1; sys_platform == "win32"
+# Windows: native toast notifications (optional; falls back silently)
+winotify>=1.1.0; sys_platform == "win32"

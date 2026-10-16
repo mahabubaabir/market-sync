@@ -87,12 +87,20 @@ def check_for_update(force: bool = False):
         tag = str(data.get("tag_name") or "")
         if is_newer(tag):
             assets = data.get("assets") or []
+            # Windows ships an .exe, Linux a .deb — pick per platform.
+            want = ".exe" if os.name == "nt" else ".deb"
             deb_url = ""
             for a in assets:
                 name = str(a.get("name") or "")
-                if name.endswith(".deb"):
+                if name.endswith(want):
                     deb_url = str(a.get("browser_download_url") or "")
                     break
+            if not deb_url:  # platform asset missing: fall back to any
+                for a in assets:
+                    name = str(a.get("name") or "")
+                    if name.endswith((".deb", ".exe")):
+                        deb_url = str(a.get("browser_download_url") or "")
+                        break
             result = {
                 "tag": tag,
                 "version": tag.lstrip("vV"),
@@ -164,9 +172,24 @@ def _which(name: str) -> bool:
 
 
 def open_in_browser(url: str) -> None:
+    if not url:
+        return
     try:
-        if url:
-            subprocess.Popen(["xdg-open", url],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if os.name == "nt":
+            os.startfile(url)  # noqa: S606 — opens the default browser
+            return
+        subprocess.Popen(["xdg-open", url],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         pass
+
+
+def install_windows(installer_path: str) -> bool:
+    """Launch a downloaded Windows installer/portable exe."""
+    if os.name != "nt" or not os.path.exists(installer_path):
+        return False
+    try:
+        os.startfile(installer_path)  # noqa: S606
+        return True
+    except Exception:
+        return False

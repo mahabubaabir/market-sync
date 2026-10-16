@@ -3,6 +3,7 @@
 from __future__ import annotations
 import json
 import os
+import sys
 from copy import deepcopy
 
 APP_NAME = "Market Sync"
@@ -26,12 +27,22 @@ IPC_SOCKET_NAME = "market_sync_ipc"
 APPLET_UUID = "market-sync@cinnamon"
 
 
+IS_WINDOWS = os.name == "nt"
+
+
 def app_dir() -> str:
-    """Directory of the *running* code (dev checkout or /opt install)."""
+    """Directory of the *running* code (dev checkout, /opt install, or exe).
+
+    PyInstaller unpacks bundled data into sys._MEIPASS; assets must resolve
+    from there when frozen.
+    """
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return sys._MEIPASS
     return os.path.dirname(os.path.abspath(__file__))
 
 
-IS_PACKAGED = os.path.exists(os.path.join(SYSTEM_INSTALL_DIR, "main.py"))
+IS_PACKAGED = (not IS_WINDOWS) and os.path.exists(
+    os.path.join(SYSTEM_INSTALL_DIR, "main.py"))
 
 # Market order matches Market Sync v0.2: London, New York, Sydney, Tokyo, NYSE.
 # Open/close times are stored market-local so DST is always correct.
@@ -142,9 +153,17 @@ DEFAULT_SETTINGS = {
     "auto_hide_panel": True,
 }
 
-CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".config", APP_ID)
+if IS_WINDOWS:
+    # %APPDATA%\KhonekTech\Market Sync — roaming settings; cache stays local
+    _APPDATA = os.environ.get("APPDATA") or os.path.expanduser("~")
+    _LOCALAPPDATA = os.environ.get("LOCALAPPDATA") or _APPDATA
+    CONFIG_DIR = os.path.join(_APPDATA, "KhonekTech", "Market Sync")
+    CACHE_DIR = os.path.join(_LOCALAPPDATA, "KhonekTech", "Market Sync", "cache")
+else:
+    CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".config", APP_ID)
+    CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", APP_ID)
+
 SETTINGS_PATH = os.path.join(CONFIG_DIR, "settings.json")
-CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", APP_ID)
 LOCK_PATH = os.path.join(CACHE_DIR, "app.lock")
 LOG_PATH = os.path.join(CACHE_DIR, "app.log")
 # Written every tick for the Cinnamon applet (spec: panel_status.json)
@@ -288,15 +307,53 @@ def _impacts_from_min(min_impact: str) -> list[str]:
     return ["High", "Medium", "Low"]
 
 
+WINDOWS_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+WINDOWS_RUN_VALUE = "MarketSync"
+
+
 def autostart_exec_line() -> str:
-    """Command line used in autostart + launcher entries."""
+    """Command line used in autostart entries (Linux .desktop / Windows Run)."""
+    if IS_WINDOWS:
+        if getattr(sys, "frozen", False):
+            return f'"{sys.executable}" --hidden'
+        return f'"{sys.executable}" "{os.path.join(app_dir(), "main.py")}" --hidden'
     if IS_PACKAGED and os.path.exists(LAUNCHER_PATH):
         return f"{LAUNCHER_PATH} --hidden"
     return f"/usr/bin/python3 {os.path.join(app_dir(), 'main.py')} --hidden"
 
 
+def set_windows_autostart(on: bool) -> bool:
+    """Enable/disable launch-at-login via the per-user Run key."""
+    try:
+        import winreg  # type: ignore[import-not-found]
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, WINDOWS_RUN_KEY) as key:
+            if on:
+                winreg.SetValueEx(key, WINDOWS_RUN_VALUE, 0, winreg.REG_SZ,
+                                  autostart_exec_line())
+            else:
+                try:
+                    winreg.DeleteValue(key, WINDOWS_RUN_VALUE)
+                except FileNotFoundError:
+                    pass
+        return True
+    except Exception:
+        return False
+
+
+def is_windows_autostart_enabled() -> bool:
+    try:
+        import winreg  # type: ignore[import-not-found]
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, WINDOWS_RUN_KEY) as key:
+            winreg.QueryValueEx(key, WINDOWS_RUN_VALUE)
+        return True
+    except Exception:
+        return False
+
+
 def is_autostart_enabled() -> bool:
     """True unless the user explicitly disabled it via Hidden=true override."""
+    if IS_WINDOWS:
+        return is_windows_autostart_enabled()
     if os.path.exists(USER_AUTOSTART_PATH):
         try:
             with open(USER_AUTOSTART_PATH, "r", encoding="utf-8") as f:

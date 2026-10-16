@@ -12,9 +12,21 @@ economic calendar.
 
 ## Install (one command)
 
-Latest release: **v1.5.3** — older `.deb` releases were pruned, so always
-install the newest asset from the
+Latest release: **v1.5.3** — always grab the newest asset from the
 [Releases page](https://github.com/mahabubaabir/market-sync/releases).
+
+| Platform | Asset | Status |
+|---|---|---|
+| Linux (Mint/Ubuntu, Cinnamon) | `market-sync_1.5.3_all.deb` | ✅ shipped |
+| Windows 10 / 11 (x64) | `MarketSync-1.5.3-win64.exe` | ✅ shipped |
+| macOS | — | planned |
+
+**Windows:** download the `.exe` and run it — no installer, no Python
+needed. It lives in the system tray; right-click for the menu, left-click
+for the panel, and it can start with Windows from Preferences. (Built with
+PyInstaller; if SmartScreen warns, choose *More info → Run anyway*.)
+
+**Linux:**
 
 ```bash
 curl -sL https://raw.githubusercontent.com/mahabubaabir/market-sync/main/install.sh | sudo bash

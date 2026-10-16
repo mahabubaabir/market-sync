@@ -4,6 +4,19 @@ Tracking file for code changes, install fixes, and how the app works.
 
 ## Changelog
 
+### v1.5.3 (Windows) — 2026-10-16 — Windows 10/11 build
+
+- Cross-platform layer: QLockFile single-instance (replaces Unix `fcntl`),
+  `%APPDATA%\KhonekTech\Market Sync` data dirs, Windows Run-key autostart,
+  `_MEIPASS`-aware asset paths, `os.startfile` browser/installer, Windows
+  toasts (winotify), `tzdata` bundling, Segoe UI/Consolas font fallbacks,
+  guarded SIGTERM, windowed-exe logging incl. thread-exception capture.
+- Packaging: `tools/make_ico.py` (native multi-size ICO), PyInstaller spec
+  with KhonekTech / mahabubaabir version metadata, `tools/build-windows.bat`,
+  GitHub Actions `windows.yml` (tests → build → smoke → attach to release).
+- Linux behavior unchanged; all gates re-run green.
+
+
 ### v1.5.3 — 2026-10-16 — No more tofu boxes; glass inside the app; logo restored
 
 - **Emoji boxes removed everywhere**: theme names (Preferences + tray menu),

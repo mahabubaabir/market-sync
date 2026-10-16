@@ -1,4 +1,4 @@
-"""Desktop notifications: plyer if available, else notify-send / zenity fallback."""
+"""Desktop notifications: plyer, else winotify (Windows), else notify-send (Linux)."""
 from __future__ import annotations
 import shutil
 import subprocess
@@ -14,6 +14,19 @@ def _via_notify_send(title: str, message: str) -> bool:
     return False
 
 
+def _via_winotify(title: str, message: str) -> bool:
+    """Native Windows toast (winotify is a tiny pure-python dependency)."""
+    import os
+    if os.name != "nt":
+        return False
+    try:
+        from winotify import Notification  # type: ignore
+        Notification(app_id="Market Sync", title=title, msg=message).show()
+        return True
+    except Exception:
+        return False
+
+
 def notify(title: str, message: str) -> None:
     try:
         from plyer import notification  # type: ignore
@@ -21,6 +34,8 @@ def notify(title: str, message: str) -> None:
         return
     except Exception:
         pass
+    if _via_winotify(title, message):
+        return
     _via_notify_send(title, message)
 
 
