@@ -7,6 +7,7 @@ dist/
 build/
 *.spec
 !tools/market-sync.spec   # hand-written build spec (not generated)
+tools/.version_info_*.txt   # generated at build time
 # opencode session exports (large, local only)
 new-session---*.json
 installation-help-request.json
