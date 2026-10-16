@@ -1,0 +1,67 @@
+name: Windows build
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller pillow tzdata pytest
+
+      - name: Unit tests (proves Windows compatibility of the code)
+        run: python -m pytest tests/ -q
+
+      - name: Render icon.ico
+        run: python tools/make_ico.py
+
+      - name: Build MarketSync.exe
+        run: python -m PyInstaller --noconfirm tools/market-sync.spec
+
+      - name: Name with version
+        shell: pwsh
+        run: |
+          $ver = python -c "import config;print(config.APP_VERSION)"
+          Copy-Item dist/MarketSync.exe "dist/MarketSync-$ver-win64.exe"
+          Get-Item "dist/MarketSync-$ver-win64.exe" | Select-Object Name, Length
+
+      - name: Smoke test (CLI exit code + GUI stays alive)
+        shell: pwsh
+        run: |
+          $cli = Start-Process -FilePath "dist/MarketSync.exe" -ArgumentList "--cli","--once" -Wait -PassThru
+          if ($cli.ExitCode -ne 0) { throw "CLI smoke failed with exit $($cli.ExitCode)" }
+          $p = Start-Process -FilePath "dist/MarketSync.exe" -ArgumentList "--hidden" -PassThru
+          Start-Sleep -Seconds 12
+          if ($p.HasExited) { throw "GUI exe exited early with code $($p.ExitCode)" }
+          Stop-Process -Id $p.Id -Force
+          Write-Host "smoke OK"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-sync-windows
+          path: dist/MarketSync-*-win64.exe
+          if-no-files-found: error
+
+      - name: Attach to GitHub release (tag builds)
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $exe = (Get-ChildItem dist/MarketSync-*-win64.exe).FullName
+          gh release upload "${{ github.ref_name }}" "$exe" --clobber
